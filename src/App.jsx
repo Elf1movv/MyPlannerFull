@@ -103,25 +103,243 @@ const BG_GRADIENT = `linear-gradient(135deg, ${THEME.skyBlue} 0%, ${THEME.warmCr
 
 // Animated background CSS — GPU optimised
 const BG_ANIM_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
   @keyframes bgShift {
     0%   { background-position: 0% 50%; }
     50%  { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
   .animated-bg {
-    background: linear-gradient(135deg,
-      #BFE7FF, #C9F0EE, #FFF5EE, #FFD2B8, #E8F4FF, #D4F0E8
-    );
-    background-size: 300% 300%;
-    animation: bgShift 55s ease infinite;
+    background: linear-gradient(125deg, #DBEAFB 0%, #E6F5ED 30%, #FCF7E2 60%, #FDEAE0 100%);
+    background-size: 220% 220%;
+    animation: bgShift 26s ease-in-out infinite;
     will-change: background-position;
+    min-height: 100vh;
   }
-  /* Perf hints */
   [draggable="true"] { will-change: transform; }
   @media (prefers-reduced-motion: reduce) {
     .animated-bg { animation: none; background-position: 0% 50%; }
-    [style*="animation"] { animation: none !important; }
   }
+
+  /* ── HEADER v17 ── */
+  .v17-header {
+    display: flex; align-items: center; gap: 20px;
+    padding: 0 34px; height: 64px;
+    background: rgba(255,255,255,0.55); backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.7);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .v17-brand { display: flex; align-items: center; gap: 12px; }
+  .v17-logo {
+    width: 42px; height: 42px; border-radius: 13px;
+    background: #FF8C42; color: #fff;
+    display: flex; align-items: center; justify-content: center; padding: 10px;
+    box-shadow: 0 6px 16px rgba(255,140,66,.38); flex-shrink: 0;
+  }
+  .v17-logo svg { width: 100%; height: 100%; }
+  .v17-brand-title {
+    font-family: 'Comfortaa', sans-serif; font-size: 22px; font-weight: 700;
+    color: #FF8C42; letter-spacing: -.01em; line-height: 1; margin: 0;
+  }
+  .v17-brand-date { font-size: 12.5px; color: #9AAAB8; font-weight: 500; margin-top: 3px; display: block; }
+
+  .v17-weather {
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 15px; border-radius: 40px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(60,45,30,.05);
+    font-size: 14px; color: #2D4A6B;
+  }
+  .v17-weather-city { font-size: 13px; color: #9AAAB8; font-weight: 500; }
+
+  .v17-sync {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: #4FB07A;
+    padding: 5px 10px; border-radius: 30px;
+    background: rgba(79,176,122,.12);
+  }
+  .v17-sync.syncing { color: #9AAAB8; background: rgba(45,74,107,.06); }
+
+  .v17-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .v17-lang {
+    display: flex; background: rgba(45,74,107,.07); border-radius: 30px; padding: 3px;
+  }
+  .v17-lang button {
+    border: 0; background: transparent; font-size: 12px; font-weight: 700;
+    color: #9AAAB8; padding: 4px 10px; border-radius: 30px; transition: .15s;
+    font-family: inherit; cursor: pointer;
+  }
+  .v17-lang button.on { background: #fff; color: #2D4A6B; box-shadow: 0 2px 6px rgba(45,74,107,.1); }
+
+  .v17-btn {
+    display: flex; align-items: center; gap: 5px;
+    border: 1px solid rgba(45,74,107,.12); background: rgba(255,255,255,.75);
+    font-size: 12.5px; font-weight: 600; color: #7C7264;
+    padding: 7px 12px; border-radius: 10px; transition: .15s; cursor: pointer;
+    font-family: inherit; backdrop-filter: blur(6px);
+  }
+  .v17-btn:hover { color: #2D4A6B; border-color: rgba(45,74,107,.2); transform: translateY(-1px); }
+
+  /* ── TABS v17 ── */
+  .v17-tabs {
+    display: inline-flex; gap: 3px; padding: 4px; border-radius: 40px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(60,45,30,.05); margin-bottom: 22px;
+  }
+  .v17-tab {
+    border: 0; background: transparent; font-size: 14px; font-weight: 600;
+    color: #9AAAB8; padding: 8px 18px; border-radius: 30px; transition: .16s;
+    cursor: pointer; font-family: inherit;
+  }
+  .v17-tab:hover { color: #2D4A6B; }
+  .v17-tab.on { background: #fff; color: #2D4A6B; box-shadow: 0 3px 10px rgba(45,74,107,.12); font-weight: 700; }
+
+  /* ── PROGRESS v17 ── */
+  .v17-progress {
+    background: #fff; border-radius: 24px; padding: 22px 26px;
+    border: 1px solid rgba(255,255,255,.8);
+    box-shadow: 0 12px 34px rgba(74,54,32,.07), 0 2px 6px rgba(74,54,32,.04);
+    margin-bottom: 18px;
+  }
+  .v17-prog-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .v17-prog-title { font-size: 15px; font-weight: 700; color: #2D4A6B; }
+  .v17-prog-msg { font-size: 12px; font-weight: 600; color: #FF8C42; margin-top: 3px; }
+  .v17-prog-num b { font-size: 28px; font-weight: 800; color: #2D4A6B; letter-spacing: -.03em; line-height: 1; }
+  .v17-prog-num span { font-size: 15px; font-weight: 700; color: #9AAAB8; }
+  .v17-bar { height: 10px; border-radius: 30px; background: rgba(45,74,107,.07); margin: 14px 0 9px; overflow: hidden; }
+  .v17-bar-fill {
+    height: 100%; border-radius: 30px; transition: width .5s cubic-bezier(.4,0,.1,1);
+    background: linear-gradient(90deg, rgba(255,140,66,.7), #FF8C42);
+    box-shadow: 0 1px 5px rgba(255,140,66,.45);
+  }
+  .v17-prog-count { font-size: 12px; color: #9AAAB8; font-weight: 500; }
+
+  /* ── BLOCK v17 ── */
+  .v17-block {
+    background: #fff; border-radius: 24px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.8);
+    box-shadow: 0 12px 34px rgba(74,54,32,.07), 0 2px 6px rgba(74,54,32,.04);
+    margin-bottom: 16px;
+  }
+  .v17-block-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 14px 14px;
+  }
+  .v17-block-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--v17-chip, rgba(255,140,66,.1));
+    padding: 6px 14px 6px 12px; border-radius: 30px; border: 0; cursor: pointer;
+  }
+  .v17-block-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--v17-dot, #FF8C42); flex-shrink: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--v17-dot, #FF8C42) 22%, transparent);
+  }
+  .v17-block-name { font-size: 16px; font-weight: 700; color: #2D4A6B; }
+  .v17-block-stats { font-size: 12px; font-weight: 600; color: #9AAAB8; margin-left: 4px; }
+  .v17-block-acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+  .v17-block-act {
+    width: 30px; height: 30px; border: 0; background: transparent; border-radius: 9px;
+    color: #9AAAB8; display: flex; align-items: center; justify-content: center;
+    padding: 6px; transition: .14s; cursor: pointer; opacity: 0;
+  }
+  .v17-block:hover .v17-block-act { opacity: 1; }
+  .v17-block-act:hover { background: rgba(45,74,107,.07); color: #2D4A6B; }
+  .v17-block-act.on { opacity: 1; color: var(--v17-dot, #FF8C42); }
+  .v17-block-act.del:hover { background: #FBDDCE; color: #C56038; }
+  .v17-block-body { padding: 4px 12px 12px; }
+
+  /* ── TASK v17 ── */
+  .v17-task {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 8px; border-radius: 12px; transition: background .14s; position: relative;
+  }
+  .v17-task:hover { background: rgba(45,74,107,.03); }
+  .v17-task + .v17-task { box-shadow: 0 -1px 0 rgba(45,74,107,.06); }
+  .v17-check {
+    width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid #C8BFB0; background: #fff;
+    display: flex; align-items: center; justify-content: center; transition: .16s; cursor: pointer;
+    padding: 3px; color: #fff;
+  }
+  .v17-check:hover { border-color: #FF8C42; }
+  .v17-check.done { background: #4FB07A; border-color: #4FB07A; }
+  .v17-cross {
+    width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid #C8BFB0; background: #fff;
+    display: flex; align-items: center; justify-content: center; transition: .16s; cursor: pointer;
+    padding: 3px; color: #fff; margin-left: -4px;
+  }
+  .v17-cross:hover { border-color: #E2664B; }
+  .v17-cross.skip { background: #E5402A; border-color: #E5402A; }
+  .v17-task-text { flex: 1; font-size: 14.5px; font-weight: 500; color: #2D4A6B; }
+  .v17-task-text.done { color: #AEA493; text-decoration: line-through; text-decoration-color: #C8BFB0; }
+  .v17-task-text.skip { color: #AEA493; text-decoration: line-through; opacity: .7; }
+  .v17-task-meta { display: flex; align-items: center; gap: 5px; flex-shrink: 0; opacity: 0; transition: opacity .15s; }
+  .v17-task:hover .v17-task-meta { opacity: 1; }
+  .v17-tag-routine {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 30px;
+    background: rgba(79,176,122,.14); color: #2E8C62;
+  }
+  .v17-tag-type {
+    font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 30px;
+    background: rgba(45,74,107,.07); color: #9AAAB8;
+  }
+  .v17-t-act {
+    width: 26px; height: 26px; border: 0; background: transparent; border-radius: 7px;
+    color: #9AAAB8; display: flex; align-items: center; justify-content: center;
+    padding: 5px; transition: .14s; cursor: pointer;
+  }
+  .v17-t-act:hover { background: rgba(45,74,107,.08); color: #2D4A6B; }
+  .v17-t-act.del:hover { background: #FBDDCE; color: #C56038; }
+
+  .v17-add-task {
+    display: flex; align-items: center; gap: 6px; border: 0; background: transparent;
+    color: #FF8C42; font-size: 13px; font-weight: 600; padding: 9px 8px 6px;
+    border-radius: 10px; transition: .14s; cursor: pointer; font-family: inherit;
+  }
+  .v17-add-task:hover { background: rgba(255,140,66,.08); }
+
+  .v17-add-block {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    border: 2px dashed rgba(45,74,107,.14); background: transparent; color: #9AAAB8;
+    font-size: 14px; font-weight: 600; padding: 16px; border-radius: 24px;
+    transition: .16s; cursor: pointer; font-family: inherit; margin-top: 2px;
+  }
+  .v17-add-block:hover { border-color: rgba(255,140,66,.45); color: #FF8C42; background: rgba(255,140,66,.05); }
+
+  /* ── EVENTS PANEL v17 ── */
+  .v17-events {
+    background: #fff; border-radius: 24px; padding: 18px;
+    border: 1px solid rgba(255,255,255,.8);
+    box-shadow: 0 12px 34px rgba(74,54,32,.07), 0 2px 6px rgba(74,54,32,.04);
+    position: sticky; top: 80px;
+  }
+  .v17-events-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .v17-events-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #2D4A6B; }
+  .v17-events-add {
+    width: 32px; height: 32px; border: 0; border-radius: 11px;
+    background: #FF8C42; color: #fff;
+    display: flex; align-items: center; justify-content: center; padding: 8px;
+    box-shadow: 0 5px 13px rgba(255,140,66,.38); transition: .15s; cursor: pointer;
+  }
+  .v17-events-add:hover { transform: translateY(-1px) scale(1.03); }
+  .v17-event {
+    display: flex; border-radius: 14px; overflow: hidden; margin-bottom: 10px;
+    background: rgba(255,140,66,.07); transition: .16s; cursor: default;
+  }
+  .v17-event:hover { transform: translateX(2px); }
+  .v17-event-rail { width: 5px; flex-shrink: 0; }
+  .v17-event-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .v17-event-when { font-size: 11px; font-weight: 700; }
+  .v17-event-tag {
+    font-size: 10px; font-weight: 600; color: #9AAAB8;
+    background: rgba(255,255,255,.7); padding: 2px 7px; border-radius: 20px;
+  }
+  .v17-event-title { font-size: 13.5px; font-weight: 600; color: #2D4A6B; }
 `;
 // ── Login Screen CSS ────────────────────────────────────────────────
 const LOGIN_CSS = `
@@ -1429,16 +1647,17 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
 
   return (
     <div>
-      {/* Day progress */}
-      <div style={{ background:"rgba(255,255,255,0.55)", borderRadius:16, padding:"18px 22px", marginBottom:18, border:"1px solid rgba(255,255,255,0.7)", backdropFilter:"none" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-          <span style={{ fontSize:13, color:THEME.textLight }}>{L.dayProgress}</span>
-          <span style={{ fontSize:13, fontWeight:600, color:THEME.text }}>{dp}%</span>
+      {/* Day progress v17 */}
+      <div className="v17-progress">
+        <div className="v17-prog-top">
+          <div>
+            <div className="v17-prog-title">{L.dayProgress}</div>
+            <div className="v17-prog-msg">{dp >= 80 ? "Отличное начало! 🔥" : dp >= 40 ? "Хороший темп 👍" : dp > 0 ? "Продолжай!" : "Начни день продуктивно"}</div>
+          </div>
+          <div className="v17-prog-num"><b>{dp}</b><span>%</span></div>
         </div>
-        <div style={{ height:6, background:"rgba(255,255,255,0.5)", borderRadius:4, overflow:"hidden" }}>
-          <div style={{ height:"100%", width:`${dp}%`, background:`linear-gradient(90deg, ${THEME.skyBlue}, ${THEME.sunsetApricot})`, borderRadius:4, transition:"width 0.6s ease" }}/>
-        </div>
-        <div style={{ marginTop:5, fontSize:12, color:THEME.textLight }}>{doneT.length} / {allT.length} {L.tasksOf}</div>
+        <div className="v17-bar"><div className="v17-bar-fill" style={{ width:`${dp}%` }}/></div>
+        <div className="v17-prog-count">{doneT.length} / {allT.length} {L.tasksOf}</div>
       </div>
 
       {/* Blocks */}
@@ -1462,52 +1681,51 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
                 }
                 setDragOver(null);
               }}
+              className="v17-block"
               style={{
-                background:"rgba(255,255,255,0.55)", border:`1px solid rgba(255,255,255,0.7)`, borderRadius:16,
-                overflow:"hidden", backdropFilter:"none",
                 outline: dragOver === idx ? `2px solid ${col.accent}` : "none",
                 opacity: dragIdx.current === idx ? 0.5 : 1,
                 transition:"all 0.15s",
                 cursor: isEditable ? "grab" : "default",
               }}>
-              {/* Block header */}
-              <div style={{ background:col.bg, padding:"13px 18px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid rgba(255,255,255,0.5)" }}>
-                {isEditable && <span style={{ color:col.text, opacity:0.4, fontSize:14, cursor:"grab", userSelect:"none" }}>⠿</span>}
-                <div style={{ width:9, height:9, borderRadius:"50%", background:col.accent, flexShrink:0 }}/>
-                <div style={{ flex:1 }}>
-                  {isEditable
-                    ? <EditableTitle value={block.names[lang]||block.names.ru} onChange={n=>onUpdateBlock(block.id,{names:{...block.names,[lang]:n}})} style={{ fontSize:14, fontWeight:600, color:col.text }}/>
-                    : <span style={{ fontSize:14, fontWeight:600, color:col.text }}>{block.names[lang]||block.names.ru}</span>}
+              {/* Block header v17 */}
+              <div className="v17-block-head" style={{ "--v17-dot": col.accent, "--v17-chip": col.bg } as any}>
+                {isEditable && <span style={{ color:"#C8BFB0", fontSize:14, cursor:"grab", userSelect:"none", opacity:0.6 }}>⠿</span>}
+                <div className="v17-block-chip" style={{ "--v17-dot": col.accent } as any}>
+                  <div className="v17-block-dot"/>
+                  <span className="v17-block-name">
+                    {isEditable
+                      ? <EditableTitle value={block.names[lang]||block.names.ru} onChange={n=>onUpdateBlock(block.id,{names:{...block.names,[lang]:n}})} style={{ fontSize:16, fontWeight:700, color:"#2D4A6B" }}/>
+                      : block.names[lang]||block.names.ru}
+                  </span>
                 </div>
-                <span style={{ fontSize:11, color:col.text, opacity:0.7 }}>{bd}/{block.tasks.length} · {bp}%</span>
-                {isEditable && (
-                  <>
-                    {/* Pin button */}
-                    <button
-                      onClick={() => onUpdateBlock(block.id, { pinned: !block.pinned })}
-                      title={block.pinned ? (lang==="ru"?"Откреплено":"Unpin") : (lang==="ru"?"Закрепить блок":"Pin block")}
-                      style={{ border:"none", background:"transparent", cursor:"pointer", fontSize:14, padding:"0 2px", opacity: block.pinned ? 1 : 0.35, transition:"opacity 0.15s", lineHeight:1 }}>
-                      📌
-                    </button>
-                    {/* Color picker */}
-                    <BlockColorPicker
-                      currentId={block.colorId}
-                      onChange={cid => onUpdateBlock(block.id, { colorId: cid })}
-                    />
-                    <button onClick={()=>onDeleteBlock(block.id)} style={{ border:"none", background:"transparent", color:"#B4B2A9", cursor:"pointer", fontSize:16, padding:"0 2px" }}>×</button>
-                  </>
-                )}
+                <span className="v17-block-stats">{bd}/{block.tasks.length} · {bp}%</span>
+                <div className="v17-block-acts">
+                  {isEditable && (
+                    <>
+                      <button className={"v17-block-act"+(block.pinned?" on":"")}
+                        onClick={() => onUpdateBlock(block.id, { pinned: !block.pinned })}
+                        title={block.pinned ? "Открепить" : "Закрепить"}>
+                        📌
+                      </button>
+                      <BlockColorPicker currentId={block.colorId} onChange={cid => onUpdateBlock(block.id, { colorId: cid })}/>
+                      <button className="v17-block-act del" onClick={()=>onDeleteBlock(block.id)} style={{ fontSize:16 }}>×</button>
+                    </>
+                  )}
+                </div>
               </div>
               {/* Progress stripe */}
-              <div style={{ height:3, background:"rgba(255,255,255,0.3)" }}>
+              <div style={{ height:3, background:"rgba(45,74,107,.06)" }}>
                 <div style={{ height:"100%", width:`${bp}%`, background:col.accent, transition:"width 0.5s ease" }}/>
               </div>
-              {/* Tasks */}
-              <div style={{ padding:"6px 0" }}>
-                {block.tasks.length === 0 && <div style={{ padding:"12px 18px", fontSize:13, color:THEME.textLight, fontStyle:"italic" }}>{L.noTasks}</div>}
+              {/* Tasks v17 */}
+              <div className="v17-block-body">
+                {block.tasks.length === 0 && <div style={{ padding:"10px 8px", fontSize:13, color:"#9AAAB8", fontStyle:"italic" }}>{L.noTasks}</div>}
                 {block.tasks.map((task, taskIdx) => {
                   const s = sc[task.status];
                   const tdo = taskDragOver?.blockId===block.id && taskDragOver?.taskIdx===taskIdx;
+                  const isDone = task.status === "done";
+                  const isFail = task.status === "failed";
                   return (
                     <div key={task.id}
                       draggable={isEditable}
@@ -1526,117 +1744,101 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
                         }
                         taskDrag.current = null; setTaskDragOver(null);
                       }}
-                      style={{ display:"flex", alignItems:"flex-start", gap:8, padding:"9px 18px",
-                        borderBottom:"1px solid rgba(255,255,255,0.4)",
-                        borderTop: tdo ? `2px solid ${THEME.sunsetApricot}` : "2px solid transparent",
-                        cursor: isEditable ? "grab" : "default",
-                        transition:"border-color 0.1s" }}>
-                      {isEditable && <span style={{ color:"#D3D1C7", fontSize:13, paddingTop:3, flexShrink:0, cursor:"grab", userSelect:"none" }}>⠿</span>}
-                      {isEditable ? (
-                        <div style={{ display:"flex", gap:4, flexShrink:0, paddingTop:1 }}>
-                          <button onClick={()=>onSetTaskStatus(block.id,task.id,task.status==="done"?"pending":"done")}
-                            style={{ width:22,height:22,borderRadius:"50%",border:`1.5px solid ${task.status==="done"?"#1D9E75":"rgba(200,200,200,0.8)"}`,background:task.status==="done"?"#1D9E75":"rgba(255,255,255,0.6)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0 }}>
-                            {task.status==="done"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✓</span>}
+                      className="v17-task"
+                      style={{ borderTop: tdo ? `2px solid ${col.accent}` : "2px solid transparent", cursor: isEditable ? "grab" : "default" }}>
+                      {isEditable && <span style={{ color:"#C8BFB0", fontSize:12, cursor:"grab", userSelect:"none", flexShrink:0 }}>⠿</span>}
+                      {/* Check / cross buttons */}
+                      {(isEditable || isStatusEditable) ? (
+                        <>
+                          <button className={"v17-check"+(isDone?" done":"")}
+                            onClick={()=>onSetTaskStatus(block.id,task.id,isDone?"pending":"done")}>
+                            {isDone && <svg viewBox="0 0 12 12" fill="none" width={12} height={12}><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                           </button>
-                          <button onClick={()=>onSetTaskStatus(block.id,task.id,task.status==="failed"?"pending":"failed")}
-                            style={{ width:22,height:22,borderRadius:"50%",border:`1.5px solid ${task.status==="failed"?"#E24B4A":"rgba(200,200,200,0.8)"}`,background:task.status==="failed"?"#E24B4A":"rgba(255,255,255,0.6)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0 }}>
-                            {task.status==="failed"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✕</span>}
+                          <button className={"v17-cross"+(isFail?" skip":"")}
+                            onClick={()=>onSetTaskStatus(block.id,task.id,isFail?"pending":"failed")}>
+                            {isFail && <svg viewBox="0 0 12 12" fill="none" width={12} height={12}><path d="M3 3l6 6M9 3L3 9" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>}
                           </button>
-                        </div>
-                      ) : isStatusEditable ? (
-                        <div style={{ display:"flex", gap:4, flexShrink:0, paddingTop:1 }}>
-                          <button onClick={()=>onSetTaskStatus(block.id,task.id,task.status==="done"?"pending":"done")}
-                            title={lang==="ru"?"Выполнено":"Done"}
-                            style={{ width:22,height:22,borderRadius:"50%",border:`1.5px solid ${task.status==="done"?"#1D9E75":"rgba(200,200,200,0.6)"}`,background:task.status==="done"?"#1D9E75":"rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0 }}>
-                            {task.status==="done"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✓</span>}
-                          </button>
-                          <button onClick={()=>onSetTaskStatus(block.id,task.id,task.status==="failed"?"pending":"failed")}
-                            title={lang==="ru"?"Не выполнено":"Failed"}
-                            style={{ width:22,height:22,borderRadius:"50%",border:`1.5px solid ${task.status==="failed"?"#E24B4A":"rgba(200,200,200,0.6)"}`,background:task.status==="failed"?"#E24B4A":"rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0 }}>
-                            {task.status==="failed"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✕</span>}
-                          </button>
-                        </div>
+                        </>
                       ) : (
-                        <div style={{ width:22,height:22,borderRadius:"50%",border:`1.5px solid ${task.status==="done"?"#1D9E75":task.status==="failed"?"#E24B4A":"rgba(200,200,200,0.8)"}`,background:task.status==="done"?"#1D9E75":task.status==="failed"?"#E24B4A":"rgba(255,255,255,0.6)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1 }}>
-                          {task.status==="done"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✓</span>}
-                          {task.status==="failed"&&<span style={{ color:"#fff",fontSize:11,fontWeight:700 }}>✕</span>}
+                        <div className={"v17-check"+(isDone?" done":isFail?" skip":"")}>
+                          {isDone && <svg viewBox="0 0 12 12" fill="none" width={12} height={12}><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          {isFail && <svg viewBox="0 0 12 12" fill="none" width={12} height={12}><path d="M3 3l6 6M9 3L3 9" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>}
                         </div>
                       )}
-                      {/* Task name — wraps fully */}
-                      <div style={{ flex:1, minWidth:0 }}>
+                      {/* Task name */}
+                      <div className={"v17-task-text"+(isDone?" done":isFail?" skip":"")}>
                         {isEditable
-                          ? <EditableTitle value={task.names[lang]||task.names.ru} onChange={n=>onUpdateTaskName(block.id,task.id,n)}
-                              style={{ fontSize:13, color:task.status==="done"?"#B4B2A9":THEME.text, textDecoration:task.status==="done"?"line-through":"none", whiteSpace:"normal", wordBreak:"break-word" }}/>
-                          : <span style={{ fontSize:13, color:task.status==="done"?"#B4B2A9":THEME.text, textDecoration:task.status==="done"?"line-through":"none", whiteSpace:"normal", wordBreak:"break-word", display:"block" }}>{task.names[lang]||task.names.ru}</span>}
+                          ? <EditableTitle value={task.names[lang]||task.names.ru} onChange={n=>onUpdateTaskName(block.id,task.id,n)} style={{ fontSize:14.5, fontWeight:500 }}/>
+                          : task.names[lang]||task.names.ru}
                       </div>
-                      {isEditable && (
-                        <RoutineLabel task={task}
-                          onToggle={()=>onToggleRoutine(block.id,task.id)}
-                          onChangeLabel={(lbl)=>onUpdateRoutineLabel(block.id,task.id,lbl)}
-                          onChangeDays={(days)=>onUpdateRoutineDays(block.id,task.id,days)}
-                          lang={lang}/>
-                      )}
-                      {!isEditable && task.routine && <span style={{ fontSize:10,padding:"2px 7px",borderRadius:10,border:"1px solid #1D9E75",background:"rgba(230,247,244,0.8)",color:"#085041",flexShrink:0 }}>{task.routineLabel||"🔄"}</span>}
-                      <div style={{ fontSize:10,padding:"2px 7px",borderRadius:10,background:s.bg,color:s.c,border:`1px solid ${s.b}`,flexShrink:0,whiteSpace:"nowrap" }}>
-                        {task.type==="daily"?(lang==="ru"?"день":"daily"):task.type==="weekly"?(lang==="ru"?"нед.":"week"):task.type==="monthly"?(lang==="ru"?"мес.":"month"):(lang==="ru"?"год":"year")}
+                      {/* Meta */}
+                      <div className="v17-task-meta">
+                        {isEditable && (
+                          <RoutineLabel task={task}
+                            onToggle={()=>onToggleRoutine(block.id,task.id)}
+                            onChangeLabel={(lbl)=>onUpdateRoutineLabel(block.id,task.id,lbl)}
+                            onChangeDays={(days)=>onUpdateRoutineDays(block.id,task.id,days)}
+                            lang={lang}/>
+                        )}
+                        {!isEditable && task.routine && <span className="v17-tag-routine">🔄 {task.routineLabel||"Рутина"}</span>}
+                        <span className="v17-tag-type">
+                          {task.type==="daily"?(lang==="ru"?"день":"daily"):task.type==="weekly"?(lang==="ru"?"нед.":"week"):task.type==="monthly"?(lang==="ru"?"мес.":"month"):(lang==="ru"?"год":"year")}
+                        </span>
+                        {isEditable && <button className="v17-t-act del" onClick={()=>onDeleteTask(block.id,task.id)} style={{ fontSize:14 }}>×</button>}
                       </div>
-                      {isEditable && <button onClick={()=>onDeleteTask(block.id,task.id)} style={{ border:"none",background:"transparent",color:"rgba(200,200,200,0.8)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0,paddingTop:1 }}>×</button>}
                     </div>
                   );
                 })}
                 {isEditable && (addingTask === block.id ? (
-                  <div style={{ padding:"9px 18px",display:"flex",gap:7,alignItems:"center",flexWrap:"wrap" }}>
+                  <div style={{ padding:"9px 8px",display:"flex",gap:7,alignItems:"center",flexWrap:"wrap" }}>
                     <input autoFocus value={newTaskName} onChange={e=>setNewTaskName(e.target.value)}
                       onKeyDown={e=>{ if(e.key==="Enter"&&newTaskName.trim()){ onAddTask(block.id,{id:uid(),names:{ru:newTaskName,en:newTaskName},status:"pending",type:newTaskType,routine:false}); setNewTaskName(""); setAddingTask(null); } if(e.key==="Escape")setAddingTask(null); }}
                       placeholder={L.newTask}
-                      style={{ flex:1,minWidth:100,border:"1px solid rgba(255,255,255,0.7)",borderRadius:8,padding:"5px 9px",fontSize:13,fontFamily:"inherit",outline:"none",background:"rgba(255,255,255,0.6)" }}/>
+                      style={{ flex:1,minWidth:100,border:"1px solid rgba(45,74,107,.15)",borderRadius:10,padding:"7px 11px",fontSize:13,fontFamily:"inherit",outline:"none",background:"#F7FAFC" }}/>
                     <select value={newTaskType} onChange={e=>setNewTaskType(e.target.value)}
-                      style={{ border:"1px solid rgba(255,255,255,0.7)",borderRadius:8,padding:"5px 7px",fontSize:11,fontFamily:"inherit",background:"rgba(255,255,255,0.6)",outline:"none" }}>
+                      style={{ border:"1px solid rgba(45,74,107,.15)",borderRadius:10,padding:"7px",fontSize:11,fontFamily:"inherit",background:"#F7FAFC",outline:"none" }}>
                       <option value="daily">{lang==="ru"?"Ежедн.":"Daily"}</option>
                       <option value="weekly">{lang==="ru"?"Еженед.":"Weekly"}</option>
                       <option value="monthly">{lang==="ru"?"Ежемес.":"Monthly"}</option>
                       <option value="yearly">{lang==="ru"?"Год":"Year"}</option>
                     </select>
                     <button onClick={()=>{ if(!newTaskName.trim())return; onAddTask(block.id,{id:uid(),names:{ru:newTaskName,en:newTaskName},status:"pending",type:newTaskType,routine:false}); setNewTaskName(""); setAddingTask(null); }}
-                      style={{ padding:"5px 12px",borderRadius:8,border:"none",background:THEME.sunsetApricot,color:"#fff",fontSize:12,cursor:"pointer",fontFamily:"inherit" }}>{L.save}</button>
+                      style={{ padding:"7px 14px",borderRadius:10,border:"none",background:"#FF8C42",color:"#fff",fontSize:12,cursor:"pointer",fontFamily:"inherit" }}>{L.save}</button>
                     <button onClick={()=>setAddingTask(null)}
-                      style={{ padding:"5px 9px",borderRadius:8,border:"1px solid rgba(255,255,255,0.6)",background:"rgba(255,255,255,0.4)",color:THEME.textLight,fontSize:12,cursor:"pointer",fontFamily:"inherit" }}>{L.cancel}</button>
+                      style={{ padding:"7px 11px",borderRadius:10,border:"1px solid rgba(45,74,107,.12)",background:"#fff",color:"#9AAAB8",fontSize:12,cursor:"pointer",fontFamily:"inherit" }}>{L.cancel}</button>
                   </div>
                 ) : (
-                  <button onClick={()=>{ setAddingTask(block.id); setNewTaskName(""); }}
-                    style={{ display:"block",width:"100%",padding:"9px 18px",border:"none",background:"transparent",textAlign:"left",fontSize:13,color:THEME.textLight,cursor:"pointer",fontFamily:"inherit" }}>
+                  <button className="v17-add-task" onClick={()=>{ setAddingTask(block.id); setNewTaskName(""); }}>
                     + {L.addTask}
                   </button>
                 ))}
-              </div>
             </div>
           );
         })}
 
-        {/* Add block */}
+        {/* Add block v17 */}
         {isEditable && (addingBlock ? (
-          <div style={{ background:"rgba(255,255,255,0.55)",border:"1px dashed rgba(200,200,200,0.6)",borderRadius:16,padding:18,backdropFilter:"none" }}>
+          <div style={{ background:"#fff",border:"1px solid rgba(45,74,107,.12)",borderRadius:24,padding:20 }}>
             <input autoFocus value={newBlockName} onChange={e=>setNewBlockName(e.target.value)}
               onKeyDown={e=>{ if(e.key==="Escape")setAddingBlock(false); }}
               placeholder={L.newBlock}
-              style={{ width:"100%",boxSizing:"border-box",border:"1px solid rgba(255,255,255,0.7)",borderRadius:8,padding:"7px 11px",fontSize:14,fontFamily:"inherit",outline:"none",background:"rgba(255,255,255,0.6)",marginBottom:11 }}/>
+              style={{ width:"100%",boxSizing:"border-box",border:"1px solid rgba(45,74,107,.15)",borderRadius:12,padding:"9px 13px",fontSize:14,fontFamily:"inherit",outline:"none",background:"#F7FAFC",marginBottom:13 }}/>
             <div style={{ display:"flex",gap:7,marginBottom:13,flexWrap:"wrap",alignItems:"center" }}>
-              <span style={{ fontSize:12,color:THEME.textLight }}>{L.blockColor}:</span>
+              <span style={{ fontSize:12,color:"#9AAAB8" }}>{L.blockColor}:</span>
               {BLOCK_COLORS.map(c=>(
                 <div key={c.id} onClick={()=>setNewBlockColor(c.id)}
-                  style={{ width:22,height:22,borderRadius:"50%",background:c.accent,cursor:"pointer",border:newBlockColor===c.id?"3px solid #1a1a18":"3px solid transparent",boxSizing:"border-box",transition:"border 0.15s" }}/>
+                  style={{ width:22,height:22,borderRadius:"50%",background:c.accent,cursor:"pointer",border:newBlockColor===c.id?"3px solid #2D4A6B":"3px solid transparent",boxSizing:"border-box",transition:"border 0.15s" }}/>
               ))}
             </div>
             <div style={{ display:"flex",gap:7 }}>
               <button onClick={()=>{ if(!newBlockName.trim())return; onUpdateBlock("__add__",{id:uid(),colorId:newBlockColor,names:{ru:newBlockName,en:newBlockName},tasks:[]}); setNewBlockName(""); setAddingBlock(false); }}
-                style={{ padding:"6px 16px",borderRadius:8,border:"none",background:THEME.sunsetApricot,color:"#fff",fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>{L.save}</button>
+                style={{ padding:"8px 18px",borderRadius:12,border:"none",background:"#FF8C42",color:"#fff",fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>{L.save}</button>
               <button onClick={()=>setAddingBlock(false)}
-                style={{ padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.6)",background:"rgba(255,255,255,0.4)",color:THEME.textLight,fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>{L.cancel}</button>
+                style={{ padding:"8px 14px",borderRadius:12,border:"1px solid rgba(45,74,107,.12)",background:"#fff",color:"#9AAAB8",fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>{L.cancel}</button>
             </div>
           </div>
         ) : (
-          <button onClick={()=>setAddingBlock(true)}
-            style={{ width:"100%",padding:"13px 18px",border:"1.5px dashed rgba(200,200,200,0.6)",borderRadius:16,background:"rgba(255,255,255,0.3)",color:THEME.textLight,fontSize:14,cursor:"pointer",fontFamily:"inherit",backdropFilter:"none" }}>
+          <button className="v17-add-block" onClick={()=>setAddingBlock(true)}>
             + {L.addBlock}
           </button>
         ))}
@@ -3145,35 +3347,42 @@ export default function App() {
         </div>
       )}
 
-      {/* Header */}
-      <header style={{ borderBottom:"1px solid rgba(255,255,255,0.5)",background:"rgba(255,255,255,0.25)",padding:"0 24px",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)" }}>
-        <div style={{ maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",height:58,gap:10 }}>
-          <div style={{ flex:1, display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontFamily:"'Dancing Script', cursive", fontSize:26, fontWeight:700, color:THEME.sunsetDeep, letterSpacing:0 }}>{headerTitle}</span>
-            <span style={{ fontSize:12,color:THEME.textLight }}>{formatDate(TODAY)}</span>
-            <WeatherWidget lang={lang}/>
-            {!isOnline && <span title="Офлайн — данные сохранены локально" style={{ fontSize:10, color:"#E24B4A", fontWeight:600 }}>📵 Офлайн</span>}
-            {isOnline && offlinePending && <span title="Синхронизация..." style={{ fontSize:10, color:THEME.sunsetDeep }}>⏳</span>}
-            {isOnline && syncing && <span style={{ fontSize:10, color:THEME.textLight, opacity:0.7 }}>☁️</span>}
+      {/* Header v17 */}
+      <header className="v17-header">
+        <div className="v17-brand">
+          <div className="v17-logo">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </div>
-          <div style={{ display:"flex",background:"rgba(255,255,255,0.4)",borderRadius:20,padding:2,gap:2 }}>
+          <div>
+            <div className="v17-brand-title">{headerTitle}</div>
+            <span className="v17-brand-date">{formatDate(TODAY)}</span>
+          </div>
+        </div>
+
+        <div className="v17-weather">
+          <WeatherWidget lang={lang}/>
+        </div>
+
+        <div className="v17-actions">
+          {!isOnline && <span style={{ fontSize:11, color:"#E24B4A", fontWeight:600 }}>📵 Офлайн</span>}
+          {isOnline && syncing && <span className="v17-sync syncing">☁ Синхронизация...</span>}
+          {isOnline && !syncing && lastSync && <span className="v17-sync">✓ Синхронизировано</span>}
+          <div className="v17-lang">
             {["ru","en"].map(l=>(
-              <button key={l} onClick={()=>setLang(l)} style={{ padding:"3px 11px",borderRadius:18,border:"none",background:lang===l?"rgba(255,255,255,0.9)":"transparent",color:lang===l?THEME.text:THEME.textLight,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s" }}>{l.toUpperCase()}</button>
+              <button key={l} className={lang===l?"on":""} onClick={()=>setLang(l)}>{l.toUpperCase()}</button>
             ))}
           </div>
           <QuickLinks lang={lang}/>
-          <button onClick={exportData} style={{ padding:"4px 11px",border:"1px solid rgba(255,255,255,0.6)",borderRadius:8,background:"rgba(255,255,255,0.4)",color:THEME.text,fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>↑ {L.export}</button>
-          <label style={{ padding:"4px 11px",border:"1px solid rgba(255,255,255,0.6)",borderRadius:8,background:"rgba(255,255,255,0.4)",color:THEME.text,fontSize:11,cursor:"pointer",userSelect:"none" }}>
+          <button className="v17-btn" onClick={exportData}>↑ {L.export}</button>
+          <label className="v17-btn" style={{ cursor:"pointer" }}>
             ↓ {L.import}<input type="file" accept=".json" onChange={importData} style={{ display:"none" }}/>
           </label>
         </div>
       </header>
 
       <main style={{ maxWidth:1200,margin:"0 auto",padding:"22px 24px 80px" }}>
-        {/* Tabs */}
-        <div style={{ display:"flex",gap:3,marginBottom:24,background:"rgba(255,255,255,0.35)",borderRadius:24,padding:3,width:"fit-content",backdropFilter:"none" }}>
-
-          {/* Сегодня — с дропдауном через портал */}
+        {/* Tabs v17 */}
+        <div className="v17-tabs">
           <TodayDropButton
             data-today-drop
             tab={tab} todayMode={todayMode} lang={lang} L={L}
@@ -3182,11 +3391,10 @@ export default function App() {
             setTab={setTab}
             setTodayMode={setTodayMode}
             setGoalsPeriod={setGoalsPeriod}
-            tabStyle={tabStyle}
+            tabStyle={t => ({ padding:"8px 18px", borderRadius:30, border:"none", cursor:"pointer", fontSize:14, fontWeight: tab===t?700:600, background: tab===t?"#fff":"transparent", color: tab===t?"#2D4A6B":"#9AAAB8", transition:"all 0.16s", fontFamily:"inherit", boxShadow: tab===t?"0 3px 10px rgba(45,74,107,.12)":"none" })}
           />
-
           {[["habits",L.habits],["calendar",L.calendar],["stats",L.stats]].map(([t,label])=>(
-            <button key={t} onClick={()=>{ setTab(t); setShowTodayDrop(false); }} style={tabStyle(t)}>{label}</button>
+            <button key={t} className={"v17-tab"+(tab===t?" on":"")} onClick={()=>{ setTab(t); setShowTodayDrop(false); }}>{label}</button>
           ))}
         </div>
 
