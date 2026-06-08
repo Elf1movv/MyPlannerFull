@@ -154,14 +154,14 @@ const LOGIN_CSS = `
     box-shadow:0 4px 11px rgba(255,140,66,0.42); }
   .lg-sw svg { width:100%; height:100%; }
 
-  /* layout */
-  .lg-row { position:absolute; inset:0; z-index:2; display:flex; align-items:center;
-    padding:0 max(6vw,80px); gap:40px; }
+  /* layout — quote & stats: aside centered in left half, card in right */
+  .lg-row { position:absolute; inset:0; z-index:2; display:flex; align-items:center; }
+  .lg-row.split { padding:0 max(5vw,60px); gap:0; justify-content:space-between; }
   .lg-row.center { justify-content:center; }
-  .lg-row.split { justify-content:space-between; }
 
-  /* aside */
-  .lg-aside { flex:1 1 auto; max-width:620px; }
+  /* aside takes left half, centers content within it */
+  .lg-aside-wrap { flex:1 1 0; display:flex; align-items:center; justify-content:center; padding:0 40px 0 0; }
+  .lg-aside { max-width:560px; width:100%; }
 
   /* quote aside */
   .lg-q-mark { font-family:'Comfortaa',sans-serif; font-size:64px; font-weight:700;
@@ -303,7 +303,7 @@ function LgCard({ pin, error, onSubmit, onKey }) {
   return (
     <div className="lg-card-zone">
       <div className="lg-card" onClick={() => inputRef.current?.focus()}>
-        <h1 className="lg-card-title">Мой <span className="lg-card-title-ex">день</span></h1>
+        <h1 className="lg-card-title">Мой день</h1>
         <p className="lg-card-sub">Твоя личная система жизни</p>
 
         {/* Pin field */}
@@ -368,24 +368,23 @@ function LgAsideQuote() {
   );
 }
 
-// ── Login: Aside Anim ────────────────────────────────────────────────
+// ── Login: Aside Anim (decorative background blobs) ─────────────────
 function LgAsideAnim() {
   return (
-    <div className="lg-aside">
-      <div className="lg-anim" style={{ position:'relative', width:'100%', height:220 }}>
-        {[
-          { w:90,h:90,l:'8%',t:'10%',bg:'#BBD9F5',anim:'lgDrift1 7s ease-in-out infinite' },
-          { w:70,h:70,l:'55%',t:'5%',bg:'#FBD7C4',anim:'lgDrift2 9s ease-in-out infinite' },
-          { w:110,h:110,l:'35%',t:'45%',bg:'#BFE6D2',anim:'lgDrift3 10s ease-in-out infinite' },
-          { w:55,h:55,l:'78%',t:'55%',bg:'#FAF0CF',anim:'lgDrift1 6s ease-in-out infinite' },
-        ].map((b,i) => (
-          <div key={i} className="lg-anim-blob" style={{
-            width:b.w,height:b.h,left:b.l,top:b.t,
-            background:b.bg,animation:b.anim,
-          }}/>
-        ))}
-      </div>
-    </div>
+    <>
+      {[
+        { w:90,h:90,l:'12%',t:'20%',bg:'#BBD9F5',anim:'lgDrift1 7s ease-in-out infinite' },
+        { w:70,h:70,l:'30%',t:'60%',bg:'#FBD7C4',anim:'lgDrift2 9s ease-in-out infinite' },
+        { w:110,h:110,l:'20%',t:'40%',bg:'#BFE6D2',anim:'lgDrift3 10s ease-in-out infinite' },
+        { w:55,h:55,l:'38%',t:'15%',bg:'#FAF0CF',anim:'lgDrift1 6s ease-in-out infinite' },
+      ].map((b,i) => (
+        <div key={i} style={{
+          position:'absolute', width:b.w, height:b.h, left:b.l, top:b.t,
+          borderRadius:'50%', background:b.bg, filter:'blur(28px)',
+          animation:b.anim, zIndex:1,
+        }}/>
+      ))}
+    </>
   );
 }
 
@@ -528,10 +527,16 @@ function PasswordScreen({ onUnlock }) {
 
       {/* Main row */}
       <div className={'lg-row ' + (isCenter ? 'center' : 'split')}>
-        {theme === 'quote' && <LgAsideQuote/>}
-        {theme === 'anim'  && <LgAsideAnim/>}
-        {theme === 'stats' && <LgAsideStats/>}
-        <LgCard pin={pin} error={error} onKey={handleKey} onSubmit={handleSubmit}/>
+        {!isCenter && (
+          <div className="lg-aside-wrap">
+            {theme === 'quote' && <LgAsideQuote/>}
+            {theme === 'stats' && <LgAsideStats/>}
+          </div>
+        )}
+        {isCenter && <LgAsideAnim/>}
+        <div style={{ flexShrink:0, paddingRight: isCenter ? 0 : 'max(5vw,60px)' }}>
+          <LgCard pin={pin} error={error} onKey={handleKey} onSubmit={handleSubmit}/>
+        </div>
       </div>
 
       {/* Success overlay */}
