@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 
 // ── Supabase Sync ───────────────────────────────────────────────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://mahvuymxoddkiquhcngx.supabase.co";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1haHZ1eW14b2Rka2lxdWhjbmd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzMwMzksImV4cCI6MjA5NDc0OTAzOX0.ZTAVqbUI5ihqbSWnIx8f9TWo6aN8uZHLXBYnr_kwK8Q";
+const SUPABASE_URL = "https://mahvuymxoddkiquhcngx.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1haHZ1eW14b2Rka2lxdWhjbmd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzMwMzksImV4cCI6MjA5NDc0OTAzOX0.ZTAVqbUI5ihqbSWnIx8f9TWo6aN8uZHLXBYnr_kwK8Q";
 
 async function sbFetch(method, body) {
   const opts = {
@@ -123,326 +123,390 @@ const BG_ANIM_STYLE = `
     [style*="animation"] { animation: none !important; }
   }
 `;
-// ── Sun Loader ──────────────────────────────────────────────────────
-function SunLoader() {
-  return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
-      <style>{`@keyframes spinSun { to { transform: rotate(360deg); } }`}</style>
-      <svg width="100" height="100" viewBox="0 0 100 100"
-        style={{ animation:"spinSun 3s linear infinite", willChange:"transform" }}>
-        {Array.from({ length: 12 }, (_, i) => {
-          const a = (i * 30) * Math.PI / 180;
-          return <line key={i} x1={50+Math.cos(a)*28} y1={50+Math.sin(a)*28}
-            x2={50+Math.cos(a)*40} y2={50+Math.sin(a)*40}
-            stroke={THEME.sunsetApricot} strokeWidth="3" strokeLinecap="round"
-            opacity={0.4 + (i % 3) * 0.2}/>;
-        })}
-        <circle cx="50" cy="50" r="20" fill={THEME.sunsetApricot}/>
-        <circle cx="50" cy="50" r="15" fill={THEME.peachGlow}/>
-      </svg>
-      <span style={{ fontSize:14, color:THEME.textLight, fontFamily:"'DM Sans',sans-serif" }}>Загрузка...</span>
-    </div>
-  );
-}
+// ── Login Screen CSS ────────────────────────────────────────────────
+const LOGIN_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
-// ── Pin Panel (shared across all themes) ────────────────────────────
-function PinPanel({ val, onChange, onKeyDown, onSubmit, error }) {
-  return (
-    <div style={{ textAlign:"center" }}>
-      <div style={{ fontFamily:"'Dancing Script', cursive", fontSize:52, fontWeight:700, color:THEME.text, lineHeight:1.1, marginBottom:6 }}>
-        Привет!
-      </div>
-      <div style={{ fontSize:13, color:THEME.textLight, marginBottom:20, letterSpacing:0.5 }}>Введите пин-код</div>
-      <input
-        type="password" value={val}
-        onChange={onChange} onKeyDown={onKeyDown}
-        autoFocus placeholder="••••"
-        style={{ display:"block", margin:"0 auto", width:190, boxSizing:"border-box", border:`2px solid ${error ? "#E24B4A" : "rgba(255,176,124,0.5)"}`, borderRadius:16, padding:"13px 18px", fontSize:22, fontFamily:"inherit", outline:"none", textAlign:"center", letterSpacing:10, background:"rgba(255,255,255,0.75)", color:THEME.text, transition:"all 0.2s", backdropFilter:"none", marginBottom:10 }}
-      />
-      {error && <div style={{ fontSize:12, color:"#E24B4A", marginBottom:8 }}>Неверный пин-код</div>}
-      <button onClick={onSubmit}
-        style={{ display:"block", margin:"0 auto", padding:"12px 44px", borderRadius:16, border:"none", background:`linear-gradient(135deg, ${THEME.sunsetApricot}, ${THEME.sunsetDeep})`, color:"#fff", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 6px 20px rgba(255,140,66,0.38)", transition:"all 0.2s", letterSpacing:0.3 }}>
-        Войти →
-      </button>
-    </div>
-  );
-}
+  .lg-stage { position:fixed; inset:0; overflow:hidden; font-family:'DM Sans','Manrope',system-ui,sans-serif; color:#2D4A6B; }
+  .lg-bg { position:absolute; inset:0; z-index:0;
+    background:linear-gradient(120deg,#D6E8FA 0%,#E4F4EC 30%,#FBF6E0 60%,#FCE7DB 100%);
+    background-size:200% 200%; animation:lgBgFlow 30s ease-in-out infinite; }
+  @keyframes lgBgFlow{0%{background-position:0% 35%}50%{background-position:100% 65%}100%{background-position:0% 35%}}
+  .lg-blob { position:absolute; border-radius:50%; filter:blur(60px); opacity:.5; }
+  .lg-blob.b1{width:520px;height:520px;background:#FBD7C4;right:-80px;top:-60px;}
+  .lg-blob.b2{width:460px;height:460px;background:#FAF0CF;left:6%;bottom:-120px;opacity:.45;}
+  .lg-blob.b3{width:380px;height:380px;background:#BBD9F5;right:18%;bottom:6%;opacity:.32;}
 
-// ── Тема 1: Цитата слева, пин справа ────────────────────────────────
-const QUOTES = [
-  { text:"Дисциплина — это мост между целями и достижениями.", author:"Джим Рон" },
-  { text:"Успех — это сумма маленьких усилий, повторяемых день за днём.", author:"Роберт Кольер" },
-  { text:"Не жди идеального момента. Возьми момент и сделай его идеальным.", author:"" },
-  { text:"Твоё будущее создаётся тем, что ты делаешь сегодня, а не завтра.", author:"Роберт Кийосаки" },
-  { text:"Победитель — это просто мечтатель, который не сдался.", author:"Нельсон Мандела" },
-  { text:"Сосредоточься на прогрессе, а не на совершенстве.", author:"" },
-  { text:"Каждый день — это новый шанс стать лучше, чем вчера.", author:"" },
-  { text:"Делай сегодня то, что другие не хотят, — завтра будешь жить так, как другие не могут.", author:"" },
-  { text:"Ты не обязан быть великим, чтобы начать. Но ты должен начать, чтобы стать великим.", author:"Зиг Зиглар" },
-  { text:"Каждый день — это маленькая жизнь. Проживи её хорошо.", author:"" },
-  { text:"Мотивация запускает. Привычка продолжает.", author:"" },
-  { text:"Думай масштабно, действуй последовательно, начни сейчас.", author:"" },
+  .lg-brand { position:absolute; z-index:6; top:26px; left:30px;
+    font-family:'Comfortaa',sans-serif; font-weight:700; font-size:23px;
+    color:#FF8C42; letter-spacing:-.01em; }
+
+  /* theme switch bottom-right */
+  .lg-switch { position:absolute; z-index:6; bottom:24px; right:24px; display:flex;
+    gap:3px; padding:4px; border-radius:30px;
+    background:rgba(255,255,255,.62); backdrop-filter:blur(8px);
+    box-shadow:0 4px 14px rgba(60,72,98,.10); }
+  .lg-sw { width:34px; height:34px; border:0; border-radius:24px; background:transparent;
+    color:#9AAAB8; display:flex; align-items:center; justify-content:center;
+    padding:8px; transition:.16s; cursor:pointer; }
+  .lg-sw:hover { color:#5E7691; }
+  .lg-sw.on { background:#FF8C42; color:#fff;
+    box-shadow:0 4px 11px rgba(255,140,66,0.42); }
+  .lg-sw svg { width:100%; height:100%; }
+
+  /* layout */
+  .lg-row { position:absolute; inset:0; z-index:2; display:flex; align-items:center;
+    padding:0 max(6vw,80px); gap:40px; }
+  .lg-row.center { justify-content:center; }
+  .lg-row.split { justify-content:space-between; }
+
+  /* aside */
+  .lg-aside { flex:1 1 auto; max-width:620px; }
+
+  /* quote aside */
+  .lg-q-mark { font-family:'Comfortaa',sans-serif; font-size:64px; font-weight:700;
+    line-height:0; height:30px; display:block; color:rgba(255,140,66,.55); }
+  .lg-q-text { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
+    line-height:1.32; color:#2D4A6B; margin:18px 0 26px; max-width:560px;
+    letter-spacing:-.01em; }
+  .lg-q-author { font-size:14px; color:#9AAAB8; font-weight:500; }
+  .lg-q-date { font-size:13px; color:#9AAAB8; margin-top:18px; }
+
+  /* stats aside */
+  .lg-s-label { font-size:13px; font-weight:700; letter-spacing:.12em;
+    text-transform:uppercase; color:#9AAAB8; }
+  .lg-s-title { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
+    color:#2D4A6B; margin:12px 0 28px; line-height:1.25; letter-spacing:-.01em; }
+  .lg-s-tile { display:flex; align-items:center; gap:16px;
+    background:rgba(255,255,255,.5); backdrop-filter:blur(6px);
+    border-radius:18px; padding:18px 22px; max-width:420px;
+    box-shadow:0 6px 18px rgba(60,72,98,.07); }
+  .lg-s-tile b { font-size:17px; font-weight:700; color:#2D4A6B; display:block; }
+  .lg-s-tile span { font-size:13px; color:#9AAAB8; font-weight:500; }
+  .lg-s-note { font-size:13.5px; font-style:italic; color:#9AAAB8; margin-top:18px; }
+
+  /* anim blobs inside aside */
+  .lg-anim { position:relative; width:100%; height:200px; }
+  .lg-anim-blob { position:absolute; border-radius:50%; filter:blur(28px); }
+  @keyframes lgDrift1{0%,100%{transform:translate(0,0)}50%{transform:translate(18px,-22px)}}
+  @keyframes lgDrift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-14px,20px)}}
+  @keyframes lgDrift3{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,14px)}}
+
+  /* card */
+  .lg-card-zone { flex:0 0 auto; display:flex; justify-content:center; }
+  .lg-card { width:300px; background:#fff; border-radius:24px; padding:36px 34px 32px;
+    box-shadow:0 26px 64px rgba(58,72,98,.17),0 5px 16px rgba(58,72,98,.07);
+    border:1px solid rgba(255,255,255,.85);
+    display:flex; flex-direction:column; align-items:center; }
+  .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes lgShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-9px)}40%,60%{transform:translateX(9px)}}
+  .lg-card-title { font-family:'Comfortaa',sans-serif; font-size:42px; font-weight:700;
+    color:#2D4A6B; line-height:1; margin:0; letter-spacing:-.02em; }
+  .lg-card-sub { font-size:13px; color:#9AAAB8; font-weight:500; margin:10px 0 22px; text-align:center; }
+
+  /* pin dots */
+  .lg-dots { display:flex; gap:11px; margin-bottom:10px; }
+  .lg-dot { width:9px; height:9px; border-radius:50%;
+    background:rgba(45,74,107,.18); transition:.15s; }
+  .lg-dot.fill { background:#2D4A6B; }
+  .lg-stage.is-error .lg-dot.fill { background:#EE5B52; }
+
+  /* error text */
+  .lg-err { height:16px; font-size:12.5px; font-weight:600; color:#EE5B52;
+    margin-bottom:10px; opacity:0; transition:opacity .2s; }
+  .lg-stage.is-error .lg-err { opacity:1; }
+
+  /* keypad */
+  .lg-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:16px; width:100%; }
+  .lg-key { height:52px; border:0; border-radius:14px; background:#F0F3F7;
+    color:#2D4A6B; font-size:20px; font-weight:600; font-family:inherit;
+    cursor:pointer; transition:.12s; display:flex; align-items:center; justify-content:center; }
+  .lg-key:hover { background:#E1E7EE; }
+  .lg-key.press { background:#D4DCE6; transform:scale(.96); }
+  .lg-key.ghost { background:transparent; pointer-events:none; }
+  .lg-key.act { font-size:16px; color:#9AAAB8; }
+
+  /* success overlay */
+  .lg-success { position:absolute; inset:0; z-index:10; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    opacity:0; pointer-events:none; transition:opacity .5s; }
+  .lg-stage.is-success .lg-success { opacity:1; pointer-events:auto; }
+  .lg-stage.is-success .lg-row { opacity:0; transition:opacity .3s; }
+  .lg-success h2 { font-family:'Comfortaa',sans-serif; font-size:32px; color:#2D4A6B; margin:0; }
+  .lg-success p { font-size:15px; color:#9AAAB8; margin:0; }
+  .lg-sun { width:64px; height:64px; color:#FF8C42; animation:lgSpinSun 9s linear infinite; }
+  @keyframes lgSpinSun{to{transform:rotate(360deg)}}
+
+  /* caption */
+  .lg-caption { position:absolute; z-index:6; bottom:20px; left:50%; transform:translateX(-50%);
+    font-size:12px; color:#9AAAB8; font-weight:500; white-space:nowrap; }
+`;
+
+// ── Login Icons ──────────────────────────────────────────────────────
+const LG_ICON = {
+  quote: (p={}) => <svg viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M4 11.5c0-3 1.8-5.2 4.4-6l.6 1.4C7.4 7.5 6.4 8.7 6.3 10c.2-.1.5-.2.9-.2 1.2 0 2.1.9 2.1 2.2 0 1.3-1 2.3-2.4 2.3C5.2 14.3 4 13 4 11.5zm6.7 0c0-3 1.8-5.2 4.4-6l.6 1.4c-1.6.6-2.6 1.8-2.7 3.1.2-.1.5-.2.9-.2 1.2 0 2.1.9 2.1 2.2 0 1.3-1 2.3-2.4 2.3-1.7 0-2.9-1.3-2.9-2.8z"/></svg>,
+  spark: (p={}) => <svg viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M10 2l1.4 4.2L15.6 7l-3.4 2.6 1.2 4.3L10 11.4 6.6 13.9l1.2-4.3L4.4 7l4.2-.8L10 2z"/><circle cx="15.5" cy="14.5" r="1.4"/><circle cx="4.8" cy="13.8" r="1"/></svg>,
+  stats: (p={}) => <svg viewBox="0 0 20 20" fill="none" {...p}><rect x="3" y="11" width="3.4" height="6" rx="1.2" fill="currentColor"/><rect x="8.3" y="7" width="3.4" height="10" rx="1.2" fill="currentColor"/><rect x="13.6" y="4" width="3.4" height="13" rx="1.2" fill="currentColor"/></svg>,
+  back: (p={}) => <svg viewBox="0 0 24 24" fill="none" {...p}><path d="M9.5 7L5 12l4.5 5M5 12h13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  sun: (p={}) => <svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="12" cy="12" r="4.4" fill="currentColor"/><g stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7L17 17M7 7L5.3 5.3"/></g></svg>,
+};
+
+const LG_QUOTES = [
+  { t: 'Делай сегодня то, что другие не хотят, — завтра будешь жить так, как другие не могут.', a: '— Джерри Райс' },
+  { t: 'Дисциплина — это мост между целями и их достижением.', a: '— Джим Рон' },
+  { t: 'Маленькие шаги каждый день приводят к большим переменам.', a: '— Народная мудрость' },
+  { t: 'Лучшее время начать было вчера. Следующее лучшее — сейчас.', a: '— Китайская пословица' },
+  { t: 'Ты не обязан быть великим, чтобы начать. Но ты должен начать, чтобы стать великим.', a: '— Зиг Зиглар' },
+  { t: 'Победитель — это просто мечтатель, который не сдался.', a: '— Нельсон Мандела' },
 ];
 
-function ThemeQuote({ pinPanel }) {
-  const idx = new Date().getDate() % QUOTES.length;
-  const q = QUOTES[idx];
+// ── Login: Pin Dots ──────────────────────────────────────────────────
+function LgPinDots({ len, error }) {
   return (
-    <div style={{ display:"flex", alignItems:"stretch", minHeight:"100vh" }}>
-      {/* LEFT — цитата */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"60px 56px", borderRight:"1px solid rgba(255,176,124,0.18)" }}>
-        <div style={{ maxWidth:420 }}>
-          <div style={{ fontSize:80, lineHeight:1, color:THEME.sunsetApricot, fontFamily:"Georgia,serif", marginBottom:16, opacity:0.5 }}>"</div>
-          <div style={{ fontFamily:"'Dancing Script', cursive", fontSize:30, fontWeight:700, color:THEME.text, lineHeight:1.55, marginBottom:24 }}>
-            {q.text}
-          </div>
-          {q.author && (
-            <div style={{ fontSize:13, color:THEME.textLight, letterSpacing:1.2, textTransform:"uppercase", fontWeight:500 }}>
-              — {q.author}
-            </div>
-          )}
-          {/* дата */}
-          <div style={{ marginTop:40, fontSize:12, color:THEME.textLight, opacity:0.7 }}>
-            {new Date().toLocaleDateString("ru-RU", { weekday:"long", day:"numeric", month:"long" })}
-          </div>
-        </div>
-      </div>
-      {/* RIGHT — пин */}
-      <div style={{ width:380, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", padding:40 }}>
-        {pinPanel}
+    <div className="lg-dots">
+      {[0,1,2,3].map(i => (
+        <span key={i} className={'lg-dot' + (i < len ? ' fill' : '')}/>
+      ))}
+    </div>
+  );
+}
+
+// ── Login: Keypad ────────────────────────────────────────────────────
+function LgKeypad({ onKey, pressed }) {
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','back'];
+  return (
+    <div className="lg-keypad">
+      {keys.map((k,i) => {
+        if (k === '') return <span key={i} className="lg-key ghost"/>;
+        if (k === 'back') return (
+          <button key={i} className={'lg-key act' + (pressed==='back' ? ' press' : '')}
+            onClick={() => onKey('back')}>
+            {LG_ICON.back({ width:20, height:20 })}
+          </button>
+        );
+        return (
+          <button key={i} className={'lg-key' + (pressed===k ? ' press' : '')}
+            onClick={() => onKey(k)}>{k}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Login: Card (center piece) ───────────────────────────────────────
+function LgCard({ pin, error, pressed, onKey }) {
+  return (
+    <div className="lg-card-zone">
+      <div className="lg-card">
+        <h1 className="lg-card-title">Мой день</h1>
+        <p className="lg-card-sub">Твоя личная система жизни</p>
+        <LgPinDots len={pin.length} error={error}/>
+        <div className="lg-err">Неверный пин-код</div>
+        <LgKeypad onKey={onKey} pressed={pressed}/>
       </div>
     </div>
   );
 }
 
-// ── Тема 2: Анимация фигур, пин по центру ───────────────────────────
-function ThemeShapes({ pinPanel }) {
+// ── Login: Aside Quote ───────────────────────────────────────────────
+function LgAsideQuote() {
+  const q = LG_QUOTES[new Date().getDate() % LG_QUOTES.length];
+  const d = new Date();
+  const days = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   return (
-    <div style={{ position:"relative", minHeight:"100vh", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <style>{`
-        @keyframes floatA { 0%,100%{transform:translate(0,0)} 50%{transform:translate(18px,-22px)} }
-        @keyframes floatB { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-14px,20px)} }
-        @keyframes floatC { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,14px)} }
-        @keyframes floatD { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-18px,-16px)} }
-        @keyframes spinDiamond { to { transform: rotate(360deg); } }
-      `}</style>
+    <div className="lg-aside">
+      <span className="lg-q-mark">&ldquo;</span>
+      <p className="lg-q-text">{q.t}</p>
+      <span className="lg-q-author">{q.a}</span>
+      <p className="lg-q-date">{days[d.getDay()]}, {d.getDate()} {months[d.getMonth()]}</p>
+    </div>
+  );
+}
 
-      {/* Static soft blobs — no JS, no blur filter */}
-      <div style={{ position:"absolute", inset:0, overflow:"hidden" }}>
+// ── Login: Aside Anim ────────────────────────────────────────────────
+function LgAsideAnim() {
+  return (
+    <div className="lg-aside">
+      <div className="lg-anim" style={{ position:'relative', width:'100%', height:220 }}>
         {[
-          { l:"8%",  t:"12%", w:220, h:220, c:THEME.skyBlue,       op:0.30, anim:"floatA 14s ease-in-out infinite" },
-          { l:"72%", t:"8%",  w:280, h:280, c:THEME.peachGlow,      op:0.25, anim:"floatB 18s ease-in-out infinite" },
-          { l:"50%", t:"60%", w:240, h:240, c:THEME.softAqua,       op:0.28, anim:"floatC 16s ease-in-out infinite" },
-          { l:"18%", t:"68%", w:160, h:160, c:THEME.sunsetApricot,  op:0.20, anim:"floatD 12s ease-in-out infinite" },
-          { l:"80%", t:"60%", w:190, h:190, c:THEME.skyBlue,        op:0.18, anim:"floatA 20s ease-in-out infinite" },
-          { l:"42%", t:"22%", w:130, h:130, c:THEME.warmCream,      op:0.35, anim:"floatB 10s ease-in-out infinite" },
+          { w:90,h:90,l:'8%',t:'10%',bg:'#BBD9F5',anim:'lgDrift1 7s ease-in-out infinite' },
+          { w:70,h:70,l:'55%',t:'5%',bg:'#FBD7C4',anim:'lgDrift2 9s ease-in-out infinite' },
+          { w:110,h:110,l:'35%',t:'45%',bg:'#BFE6D2',anim:'lgDrift3 10s ease-in-out infinite' },
+          { w:55,h:55,l:'78%',t:'55%',bg:'#FAF0CF',anim:'lgDrift1 6s ease-in-out infinite' },
         ].map((b,i) => (
-          <div key={i} style={{ position:"absolute", left:b.l, top:b.t, width:b.w, height:b.h,
-            borderRadius:"50%", background:b.c, opacity:b.op,
-            animation:b.anim, willChange:"transform",
-            filter:"blur(32px)" /* single cheap blur per blob, not nested */
+          <div key={i} className="lg-anim-blob" style={{
+            width:b.w,height:b.h,left:b.l,top:b.t,
+            background:b.bg,animation:b.anim,
           }}/>
         ))}
       </div>
-
-      {/* Floating small shapes — CSS only */}
-      <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", overflow:"visible" }}
-        viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
-        {[
-          { cx:120, cy:90,  r:8,  c:THEME.sunsetApricot, anim:"floatA 9s ease-in-out infinite",  type:"circle" },
-          { cx:560, cy:120, r:6,  c:THEME.skyBlue,       anim:"floatB 13s ease-in-out infinite", type:"circle" },
-          { cx:360, cy:60,  r:7,  c:THEME.softAqua,      anim:"floatC 11s ease-in-out infinite", type:"circle" },
-          { cx:680, cy:300, r:9,  c:THEME.peachGlow,     anim:"floatD 15s ease-in-out infinite", type:"diamond" },
-          { cx:240, cy:430, r:7,  c:THEME.sunsetApricot, anim:"floatA 17s ease-in-out infinite", type:"diamond" },
-          { cx:500, cy:480, r:10, c:THEME.skyBlue,       anim:"floatB 12s ease-in-out infinite", type:"diamond" },
-        ].map((s,i) => {
-          const style = { animation: s.anim, willChange:"transform", transformOrigin:`${s.cx}px ${s.cy}px` };
-          if (s.type==="circle") return (
-            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill={s.c} opacity="0.5"
-              style={style}/>
-          );
-          const d = s.r * 1.4;
-          return (
-            <polygon key={i}
-              points={`${s.cx},${s.cy-d} ${s.cx+d},${s.cy} ${s.cx},${s.cy+d} ${s.cx-d},${s.cy}`}
-              fill={s.c} opacity="0.4" style={style}/>
-          );
-        })}
-      </svg>
-
-      {/* Pin card */}
-      <div style={{ position:"relative", zIndex:2, background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:28, padding:"48px 52px", boxShadow:"0 8px 32px rgba(191,231,255,0.25)" }}>
-        {pinPanel}
-      </div>
     </div>
   );
 }
 
-// ── Тема 3: Статистика вчера слева, пин справа ──────────────────────
-function ThemeStats({ pinPanel }) {
-  const data = (() => {
-    try { const r = localStorage.getItem("dailyplanner_v3"); return r ? JSON.parse(r) : null; } catch { return null; }
-  })();
-
-  const yesterday = (() => {
-    const d = new Date(); d.setDate(d.getDate()-1); return localDateStr(d);
-  })();
-
+// ── Login: Aside Stats ───────────────────────────────────────────────
+function LgAsideStats() {
+  const data = (() => { try { const r=localStorage.getItem("dailyplanner_v3"); return r?JSON.parse(r):null; } catch{return null;} })();
+  const yesterday = (() => { const d=new Date(); d.setDate(d.getDate()-1); return localDateStr(d); })();
   const yBlocks = data?.days?.[yesterday]?.blocks || [];
-  const yTasks  = yBlocks.flatMap(b => b.tasks);
-  const yDone   = yTasks.filter(t => t.status === "done").length;
-  const yTotal  = yTasks.length;
-  const yPct    = yTotal > 0 ? Math.round(yDone/yTotal*100) : null;
-
-  const habits    = data?.habits || [];
-  const habitLog  = data?.habitLog || {};
-  const streaks   = habits.map(h => {
-    let s = 0; const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      if (habitLog[localDateStr(d)]?.[h.id]) { s++; d.setDate(d.getDate()-1); } else break;
+  const yTasks = yBlocks.flatMap(b=>b.tasks);
+  const yDone = yTasks.filter(t=>t.status==="done").length;
+  const yTotal = yTasks.length;
+  const yPct = yTotal>0 ? Math.round(yDone/yTotal*100) : 0;
+  const habits = data?.habits || [];
+  const habitLog = data?.habitLog || {};
+  let maxStreak = 0;
+  habits.forEach(h => {
+    let s=0; const d=new Date();
+    for(let i=0;i<60;i++){
+      if(habitLog[localDateStr(d)]?.[h.id]){s++;d.setDate(d.getDate()-1);}else break;
     }
-    return { name: h.names?.ru || "Привычка", streak: s, color: h.color };
-  }).filter(h => h.streak > 0).sort((a,b) => b.streak - a.streak).slice(0,4);
-
-  const goodDays = Array.from({length:7},(_,i) => {
-    const d = new Date(); d.setDate(d.getDate()-i);
-    const bl = data?.days?.[localDateStr(d)]?.blocks || [];
-    const t = bl.flatMap(b=>b.tasks);
-    return t.length > 0 && t.filter(t=>t.status==="done").length/t.length >= 0.8;
+    if(s>maxStreak) maxStreak=s;
+  });
+  const goodDays = Array.from({length:7},(_,i)=>{
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const bl=data?.days?.[localDateStr(d)]?.blocks||[];
+    const t=bl.flatMap(b=>b.tasks);
+    return t.length>0&&t.filter(t=>t.status==="done").length/t.length>=0.8;
   }).filter(Boolean).length;
 
-  const yDate = new Date(); yDate.setDate(yDate.getDate()-1);
-  const yDateStr = yDate.toLocaleDateString("ru-RU", { day:"numeric", month:"long" });
-
   return (
-    <div style={{ display:"flex", alignItems:"stretch", minHeight:"100vh" }}>
-      {/* LEFT — статистика */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"60px 56px", borderRight:"1px solid rgba(255,176,124,0.18)" }}>
-        <div style={{ maxWidth:400, width:"100%" }}>
-          <div style={{ fontSize:13, color:THEME.textLight, letterSpacing:1.5, textTransform:"uppercase", marginBottom:6, fontWeight:600 }}>Вчера · {yDateStr}</div>
-          <div style={{ fontFamily:"'Dancing Script', cursive", fontSize:36, fontWeight:700, color:THEME.text, marginBottom:32, lineHeight:1.2 }}>
-            {yPct === null ? "Начни планировать сегодня ✨" : yPct === 100 ? "Идеальный день! 🏆" : yPct >= 70 ? "Отличный результат! 🔥" : yPct >= 40 ? "Хороший задел 👍" : "Завтра будет лучше 💪"}
-          </div>
-
-          {/* Прогресс вчера */}
-          {yTotal > 0 && (
-            <div style={{ marginBottom:28 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-                <span style={{ fontSize:13, color:THEME.text, fontWeight:500 }}>Задачи выполнены</span>
-                <span style={{ fontSize:13, fontWeight:700, color:THEME.sunsetDeep }}>{yDone}/{yTotal} · {yPct}%</span>
-              </div>
-              <div style={{ height:8, background:"rgba(255,255,255,0.5)", borderRadius:6, overflow:"hidden", border:"1px solid rgba(255,176,124,0.2)" }}>
-                <div style={{ height:"100%", width:`${yPct}%`, background:`linear-gradient(90deg,${THEME.skyBlue},${THEME.sunsetApricot})`, borderRadius:6, transition:"width 1s ease" }}/>
-              </div>
-            </div>
-          )}
-
-          {/* Стрики */}
-          {streaks.length > 0 && (
-            <div style={{ marginBottom:28 }}>
-              <div style={{ fontSize:12, color:THEME.textLight, letterSpacing:1, textTransform:"uppercase", marginBottom:12, fontWeight:600 }}>Активные стрики</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {streaks.map((h,i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:10, height:10, borderRadius:"50%", background:h.color, flexShrink:0 }}/>
-                    <span style={{ fontSize:13, color:THEME.text, flex:1 }}>{h.name}</span>
-                    <span style={{ fontSize:13, fontWeight:700, color:h.color }}>🔥 {h.streak} дн.</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Хорошие дни */}
-          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", background:"rgba(255,255,255,0.45)", borderRadius:12, border:"1px solid rgba(255,255,255,0.6)" }}>
-            <span style={{ fontSize:22 }}>⭐</span>
-            <div>
-              <div style={{ fontSize:14, fontWeight:600, color:THEME.text }}>{goodDays} из 7 дней</div>
-              <div style={{ fontSize:11, color:THEME.textLight }}>выполнено на 80%+</div>
-            </div>
-          </div>
-
-          {yTotal === 0 && !streaks.length && (
-            <div style={{ textAlign:"center", color:THEME.textLight, fontSize:14, fontStyle:"italic", padding:"20px 0" }}>
-              Данные появятся после первого дня планирования
-            </div>
-          )}
+    <div className="lg-aside">
+      <div className="lg-s-label">Твой прогресс</div>
+      <div className="lg-s-title">
+        {yPct===100?"Идеальный день! 🏆":yPct>=70?"Отличный результат! 🔥":yPct>=40?"Хороший задел 👍":"Продолжай в том же духе 💪"}
+      </div>
+      <div className="lg-s-tile" style={{ marginBottom:12 }}>
+        <span style={{ fontSize:28 }}>⭐</span>
+        <div>
+          <b>{yDone}/{yTotal} задач вчера</b>
+          <span>{yPct}% выполнено</span>
         </div>
       </div>
-      {/* RIGHT — пин */}
-      <div style={{ width:380, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", padding:40 }}>
-        {pinPanel}
+      <div className="lg-s-tile" style={{ marginBottom:12 }}>
+        <span style={{ fontSize:28 }}>🔥</span>
+        <div>
+          <b>{maxStreak} дней серия</b>
+          <span>лучшая активная привычка</span>
+        </div>
+      </div>
+      <div className="lg-s-tile">
+        <span style={{ fontSize:28 }}>📅</span>
+        <div>
+          <b>{goodDays} из 7 дней</b>
+          <span>выполнено на 80%+</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Password Screen ─────────────────────────────────────────────────
+// ── Password Screen ──────────────────────────────────────────────────
 function PasswordScreen({ onUnlock }) {
-  const [val, setVal]       = useState("");
+  const [pin, setPin]       = useState('');
   const [error, setError]   = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [shake, setShake]   = useState(false);
+  const [pressed, setPressed] = useState(null);
   const [theme, setTheme]   = useState(() => localStorage.getItem("login_theme") || "quote");
+  const timers = useRef([]);
 
-  const attempt = () => {
-    if (loading) return;
-    if (val === CORRECT_PASSWORD) {
-      setLoading(true);
-      setTimeout(() => { localStorage.setItem("planner_auth", "1"); onUnlock(); }, 1800);
-    } else {
-      setError(true); setVal("");
-      setTimeout(() => setError(false), 1500);
-    }
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const after = (ms, fn) => { const t = setTimeout(fn, ms); timers.current.push(t); };
+
+  const flash = (k) => {
+    setPressed(k);
+    after(120, () => setPressed(null));
   };
 
-  const pinPanel = (
-    <PinPanel
-      val={val}
-      onChange={e => setVal(e.target.value)}
-      onKeyDown={e => e.key === "Enter" && attempt()}
-      onSubmit={attempt}
-      error={error}
-    />
-  );
+  const handleKey = useCallback((k) => {
+    if (success) return;
+    flash(k);
+    if (k === 'back') { setError(false); setPin(p => p.slice(0,-1)); return; }
+    setError(false);
+    setPin(prev => {
+      if (prev.length >= 4) return prev;
+      const next = prev + k;
+      if (next.length === 4) {
+        after(120, () => {
+          if (next === CORRECT_PASSWORD) {
+            setSuccess(true);
+            after(1400, () => { localStorage.setItem("planner_auth","1"); onUnlock(); });
+          } else {
+            setShake(true); setError(true);
+            after(420, () => { setPin(''); setShake(false); });
+            after(1500, () => setError(false));
+          }
+        });
+      }
+      return next;
+    });
+  }, [success, onUnlock]);
+
+  // Physical keyboard
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key >= '0' && e.key <= '9') handleKey(e.key);
+      else if (e.key === 'Backspace') handleKey('back');
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [handleKey]);
+
+  const stageCls = 'lg-stage'
+    + (error ? ' is-error' : '')
+    + (shake ? ' is-shake' : '')
+    + (success ? ' is-success' : '');
 
   const THEMES = [
-    { id:"quote",  label:"✦", title:"Цитата дня" },
-    { id:"shapes", label:"◈", title:"Анимация" },
-    { id:"stats",  label:"📊", title:"Мой прогресс" },
+    { id:'quote', icon: LG_ICON.quote },
+    { id:'anim',  icon: LG_ICON.spark },
+    { id:'stats', icon: LG_ICON.stats },
   ];
 
-  return (
-    <div className="animated-bg" style={{ minHeight:"100vh", fontFamily:"'DM Sans','Helvetica Neue',Arial,sans-serif", overflow:"hidden", position:"relative" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Dancing+Script:wght@700&display=swap" rel="stylesheet"/>
-      <style>{BG_ANIM_STYLE + `@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+  const isCenter = theme === 'anim';
 
-      {/* App name top-left */}
-      <div style={{ position:"absolute", top:24, left:32, zIndex:20 }}>
-        <span style={{ fontFamily:"'Dancing Script', cursive", fontSize:26, fontWeight:700, color:THEME.sunsetDeep, letterSpacing:0.5 }}>Мой планер</span>
+  return (
+    <div className={stageCls}>
+      <style>{LOGIN_CSS}</style>
+      <div className="lg-bg"/>
+      <div className="lg-blob b1"/>
+      <div className="lg-blob b2"/>
+      <div className="lg-blob b3"/>
+      <div className="lg-brand">Мой день</div>
+
+      {/* Main row */}
+      <div className={'lg-row ' + (isCenter ? 'center' : 'split')}>
+        {theme === 'quote' && <LgAsideQuote/>}
+        {theme === 'anim'  && <LgAsideAnim/>}
+        {theme === 'stats' && <LgAsideStats/>}
+        <LgCard pin={pin} error={error} pressed={pressed} onKey={handleKey}/>
       </div>
 
-      {loading ? (
-        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <SunLoader/>
-        </div>
-      ) : (
-        <>
-          {theme === "quote"  && <ThemeQuote  pinPanel={pinPanel}/>}
-          {theme === "shapes" && <ThemeShapes pinPanel={pinPanel}/>}
-          {theme === "stats"  && <ThemeStats  pinPanel={pinPanel}/>}
+      {/* Success overlay */}
+      <div className="lg-success">
+        <svg className="lg-sun" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.4" fill="#FF8C42"/>
+          <g stroke="#FF8C42" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7L17 17M7 7L5.3 5.3"/>
+          </g>
+        </svg>
+        <h2>С возвращением!</h2>
+        <p>Хорошего и продуктивного дня ✨</p>
+      </div>
 
-          {/* Theme toggle — bottom right */}
-          <div style={{ position:"fixed", bottom:28, right:28, zIndex:20, display:"flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.55)", backdropFilter:"blur(12px)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:40, padding:"5px 7px", boxShadow:"0 4px 20px rgba(191,231,255,0.35)" }}>
-            {THEMES.map(t => (
-              <button key={t.id} onClick={() => { setTheme(t.id); localStorage.setItem("login_theme", t.id); }}
-                title={t.title}
-                style={{ width:32, height:32, borderRadius:"50%", border:"none", cursor:"pointer", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", fontFamily:"inherit", background: theme===t.id ? `linear-gradient(135deg,${THEME.sunsetApricot},${THEME.sunsetDeep})` : "transparent", color: theme===t.id ? "#fff" : THEME.textLight, transform: theme===t.id ? "scale(1.15)" : "scale(1)", boxShadow: theme===t.id ? "0 2px 8px rgba(255,140,66,0.4)" : "none" }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {/* Theme switch */}
+      <div className="lg-switch">
+        {THEMES.map(t => (
+          <button key={t.id} className={'lg-sw' + (theme===t.id ? ' on' : '')}
+            onClick={() => { setTheme(t.id); localStorage.setItem("login_theme", t.id); }}>
+            {t.icon({ width:18, height:18 })}
+          </button>
+        ))}
+      </div>
+
+      <div className="lg-caption">MyPlanner v17 · Твой личный планировщик</div>
     </div>
   );
 }
@@ -2401,26 +2465,23 @@ function applyNewDay(data, today) {
 }
 
 // ── Pomodoro Timer ───────────────────────────────────────────────────
-const POMO_STYLES = ["ring", "minimal", "bold"];
-const POMO_STYLE_LABELS = { ring:"Кольцо", minimal:"Минимал", bold:"Крупный" };
-
 function PomodoroTimer({ lang }) {
   const WORK_MIN = 25, BREAK_MIN = 5;
   const [phase, setPhase]       = useState("work"); // "work" | "break"
   const [seconds, setSeconds]   = useState(WORK_MIN * 60);
   const [running, setRunning]   = useState(false);
   const [open, setOpen]         = useState(false);
-  const [style, setStyle]       = useState(() => localStorage.getItem("pomo_style") || "ring");
   const [sessions, setSessions] = useState(0);
   const intervalRef             = useRef(null);
-  const audioCtx                = useRef(null);
 
   const total = phase === "work" ? WORK_MIN * 60 : BREAK_MIN * 60;
   const pct   = ((total - seconds) / total) * 100;
   const mm    = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss    = String(seconds % 60).padStart(2, "0");
 
-  // Beep on phase end
+  const accent = phase === "work" ? "#FF8C42" : "#1D9E75";
+  const label  = phase === "work" ? (lang==="ru"?"Фокус":"Focus") : (lang==="ru"?"Перерыв":"Break");
+
   const beep = () => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2448,7 +2509,7 @@ function PomodoroTimer({ lang }) {
             setPhase("work");
             setSeconds(WORK_MIN * 60);
           }
-          return s; // will be overwritten above
+          return s;
         }
         return s - 1;
       });
@@ -2462,141 +2523,179 @@ function PomodoroTimer({ lang }) {
     setSeconds(WORK_MIN * 60);
   };
 
-  const cycleStyle = () => {
-    const next = POMO_STYLES[(POMO_STYLES.indexOf(style) + 1) % POMO_STYLES.length];
-    setStyle(next);
-    localStorage.setItem("pomo_style", next);
-  };
+  // ── Compact widget (always visible) ──
+  const widget = (
+    <div style={{
+      position: "fixed", bottom: 88, right: 24, zIndex: 7980,
+      background: "#fff",
+      borderRadius: 16,
+      boxShadow: "0 4px 24px rgba(0,0,0,0.10)",
+      padding: "10px 16px 10px 14px",
+      display: "flex", alignItems: "center", gap: 12,
+      minWidth: 148,
+      userSelect: "none",
+    }}>
+      {/* Phase indicator dot */}
+      <div style={{
+        width: 8, height: 8, borderRadius: "50%",
+        background: accent,
+        flexShrink: 0,
+        boxShadow: running ? `0 0 0 3px ${accent}33` : "none",
+        transition: "box-shadow 0.3s",
+      }}/>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: "#9AAAB8", letterSpacing: 0.8, textTransform: "uppercase", lineHeight: 1 }}>
+          {lang === "ru" ? "Помодоро" : "Pomodoro"}
+        </div>
+        <div style={{
+          fontSize: 26, fontWeight: 700, color: "#2D4A6B",
+          fontFamily: "'DM Sans', sans-serif", lineHeight: 1.15,
+          letterSpacing: -0.5,
+        }}>
+          {mm}:{ss}
+        </div>
+      </div>
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {/* Play/Pause */}
+        <button onClick={() => setRunning(r => !r)} title={running ? "Пауза" : "Старт"}
+          style={{
+            width: 32, height: 32, borderRadius: "50%", border: "none",
+            background: running ? "#FFF0E8" : `linear-gradient(135deg, #FFB07C, #FF8C42)`,
+            color: running ? "#FF8C42" : "#fff",
+            fontSize: 13, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: running ? "none" : "0 2px 8px rgba(255,140,66,0.35)",
+            transition: "all 0.15s",
+          }}>
+          {running ? "⏸" : "▶"}
+        </button>
+        {/* Reset */}
+        <button onClick={reset} title="Сброс"
+          style={{
+            width: 28, height: 28, borderRadius: "50%", border: "1px solid #E8EEF4",
+            background: "#F7FAFC",
+            color: "#9AAAB8", fontSize: 13, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+          ↺
+        </button>
+      </div>
+    </div>
+  );
 
-  const accent = phase === "work" ? THEME.sunsetDeep : "#1D9E75";
-  const label  = phase === "work" ? (lang==="ru"?"Фокус":"Focus") : (lang==="ru"?"Перерыв":"Break");
-
-  // ── Floating button (always visible) ──
+  // ── Floating 🍅 button ──
   const floatBtn = (
     <button onClick={() => setOpen(o => !o)}
       style={{
-        position:"fixed", bottom:32, right:32, zIndex:8000,
-        width:56, height:56, borderRadius:"50%",
-        background: running
-          ? `conic-gradient(${accent} ${pct*3.6}deg, rgba(255,255,255,0.3) 0deg)`
-          : `linear-gradient(135deg,${THEME.sunsetApricot},${THEME.sunsetDeep})`,
-        border:"none", cursor:"pointer", boxShadow:"0 4px 20px rgba(255,140,66,0.45)",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        transition:"transform 0.15s", transform: open?"scale(1.1)":"scale(1)",
+        position: "fixed", bottom: 24, right: 24, zIndex: 8000,
+        width: 52, height: 52, borderRadius: "50%",
+        background: open
+          ? `linear-gradient(135deg, #FF8C42, #FFB07C)`
+          : `linear-gradient(135deg, #FFB07C, #FF8C42)`,
+        border: "none", cursor: "pointer",
+        boxShadow: "0 4px 18px rgba(255,140,66,0.40)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 22,
+        transform: open ? "scale(1.08) rotate(10deg)" : "scale(1)",
+        transition: "transform 0.2s, box-shadow 0.2s",
       }}>
-      <span style={{ fontSize:running?11:20, fontWeight:700, color:"#fff", fontFamily:"'DM Sans',sans-serif" }}>
-        {running ? `${mm}:${ss}` : "🍅"}
-      </span>
+      🍅
     </button>
   );
 
-  if (!open) return floatBtn;
+  // ── Expanded panel (opens above widget) ──
+  const expandedPanel = open && createPortal(
+    <>
+      <div style={{ position: "fixed", inset: 0, zIndex: 7990 }} onClick={() => setOpen(false)}/>
+      <div style={{
+        position: "fixed", bottom: 155, right: 24, zIndex: 7991,
+        background: "rgba(255,255,255,0.98)",
+        borderRadius: 20,
+        border: "1px solid rgba(232,238,244,0.8)",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.12)",
+        padding: "18px 20px",
+        minWidth: 220,
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#2D4A6B" }}>
+            {lang === "ru" ? "Помодоро" : "Pomodoro"}
+          </span>
+          <span style={{ fontSize: 11, color: "#9AAAB8" }}>
+            🔥 {sessions} {lang === "ru" ? "сессий" : "sessions"}
+          </span>
+        </div>
 
-  // ── Ring style ──
-  const renderRing = () => {
-    const r = 54, cx = 70, cy = 70;
-    const circ = 2 * Math.PI * r;
-    const dash = circ * (1 - pct / 100);
-    return (
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-        <svg width={140} height={140} viewBox="0 0 140 140">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={8}/>
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke={accent} strokeWidth={8}
-            strokeDasharray={circ} strokeDashoffset={dash}
-            strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`}
-            style={{ transition:"stroke-dashoffset 0.9s linear" }}/>
-          <text x={cx} y={cy-8} textAnchor="middle" fontSize={26} fontWeight={700} fill={THEME.text} fontFamily="'DM Sans',sans-serif">{mm}:{ss}</text>
-          <text x={cx} y={cy+14} textAnchor="middle" fontSize={11} fill={THEME.textLight} fontFamily="'DM Sans',sans-serif">{label}</text>
-        </svg>
+        {/* Ring timer */}
+        {(() => {
+          const r = 54, cx = 70, cy = 70;
+          const circ = 2 * Math.PI * r;
+          const dash = circ * (1 - pct / 100);
+          return (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <svg width={140} height={140} viewBox="0 0 140 140">
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={8}/>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={accent} strokeWidth={8}
+                  strokeDasharray={circ} strokeDashoffset={dash}
+                  strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`}
+                  style={{ transition: "stroke-dashoffset 0.9s linear" }}/>
+                <text x={cx} y={cy-8} textAnchor="middle" fontSize={26} fontWeight={700} fill="#2D4A6B" fontFamily="'DM Sans',sans-serif">{mm}:{ss}</text>
+                <text x={cx} y={cy+14} textAnchor="middle" fontSize={11} fill="#9AAAB8" fontFamily="'DM Sans',sans-serif">{label}</text>
+              </svg>
+            </div>
+          );
+        })()}
+
+        {/* Phase dots */}
+        <div style={{ display: "flex", gap: 6, margin: "10px 0 0", justifyContent: "center" }}>
+          {["work", "break"].map(p => (
+            <div key={p} style={{
+              height: 3, flex: 1, borderRadius: 2,
+              background: phase === p ? accent : "rgba(200,200,200,0.3)",
+              transition: "background 0.3s",
+            }}/>
+          ))}
+        </div>
+
+        {/* Controls */}
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <button onClick={() => setRunning(r => !r)}
+            style={{
+              flex: 1, padding: "9px 0", borderRadius: 12, border: "none",
+              background: `linear-gradient(135deg, ${accent}, ${phase === "work" ? "#FFB07C" : "#3DBE8A"})`,
+              color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              fontFamily: "inherit",
+              boxShadow: `0 4px 14px ${accent}55`,
+            }}>
+            {running ? (lang === "ru" ? "⏸ Пауза" : "⏸ Pause") : (lang === "ru" ? "▶ Старт" : "▶ Start")}
+          </button>
+          <button onClick={reset}
+            style={{
+              padding: "9px 14px", borderRadius: 12,
+              border: "1px solid rgba(200,200,200,0.4)",
+              background: "rgba(255,255,255,0.4)", color: "#9AAAB8",
+              fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+            }}>
+            ↺
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, color: "#9AAAB8" }}>
+          {lang === "ru"
+            ? `${sessions * WORK_MIN} мин фокуса сегодня`
+            : `${sessions * WORK_MIN} min focused today`}
+        </div>
       </div>
-    );
-  };
-
-  // ── Minimal style ──
-  const renderMinimal = () => (
-    <div style={{ textAlign:"center", padding:"8px 0" }}>
-      <div style={{ fontSize:48, fontWeight:700, color:accent, fontFamily:"'DM Sans',sans-serif", lineHeight:1 }}>{mm}:{ss}</div>
-      <div style={{ fontSize:12, color:THEME.textLight, marginTop:4 }}>{label}</div>
-      <div style={{ height:3, background:"rgba(255,255,255,0.3)", borderRadius:2, margin:"10px 0 0", overflow:"hidden" }}>
-        <div style={{ height:"100%", width:`${pct}%`, background:accent, borderRadius:2, transition:"width 0.9s linear" }}/>
-      </div>
-    </div>
-  );
-
-  // ── Bold style ──
-  const renderBold = () => (
-    <div style={{ textAlign:"center", padding:"4px 0" }}>
-      <div style={{ fontSize:14, fontWeight:600, color:accent, letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize:56, fontWeight:900, color:THEME.text, fontFamily:"'DM Sans',sans-serif", lineHeight:1 }}>{mm}</div>
-      <div style={{ fontSize:32, fontWeight:700, color:THEME.textLight, marginTop:-4 }}>:{ss}</div>
-    </div>
+    </>,
+    document.body
   );
 
   return (
     <>
+      {widget}
       {floatBtn}
-      {createPortal(
-        <>
-          <div style={{ position:"fixed", inset:0, zIndex:7990 }} onClick={() => setOpen(false)}/>
-          <div style={{
-            position:"fixed", bottom:100, right:32, zIndex:7991,
-            background:"rgba(255,255,255,0.97)", borderRadius:24,
-            border:"1px solid rgba(255,255,255,0.9)",
-            boxShadow:"0 16px 48px rgba(0,0,0,0.14)",
-            padding:"20px 24px", minWidth:220,
-          }}
-            onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-              <span style={{ fontSize:14, fontWeight:700, color:THEME.text }}>🍅 Помодоро</span>
-              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                <span style={{ fontSize:11, color:THEME.textLight }}>🔥 {sessions}</span>
-                <button onClick={cycleStyle}
-                  title="Сменить стиль"
-                  style={{ fontSize:10, padding:"2px 8px", borderRadius:8, border:`1px solid ${THEME.sunsetApricot}`, background:"rgba(255,176,124,0.1)", color:THEME.sunsetDeep, cursor:"pointer", fontFamily:"inherit" }}>
-                  {POMO_STYLE_LABELS[style]}
-                </button>
-              </div>
-            </div>
-
-            {/* Timer display */}
-            {style === "ring"    && renderRing()}
-            {style === "minimal" && renderMinimal()}
-            {style === "bold"    && renderBold()}
-
-            {/* Phase indicator */}
-            <div style={{ display:"flex", gap:6, margin:"14px 0 0", justifyContent:"center" }}>
-              {["work","break"].map(p => (
-                <div key={p} style={{ height:3, flex:1, borderRadius:2, background: phase===p ? accent : "rgba(200,200,200,0.3)", transition:"background 0.3s" }}/>
-              ))}
-            </div>
-
-            {/* Controls */}
-            <div style={{ display:"flex", gap:8, marginTop:14 }}>
-              <button onClick={() => setRunning(r => !r)}
-                style={{ flex:1, padding:"9px 0", borderRadius:12, border:"none",
-                  background:`linear-gradient(135deg,${accent},${phase==="work"?THEME.sunsetApricot:"#3DBE8A"})`,
-                  color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit",
-                  boxShadow:`0 4px 14px ${accent}55` }}>
-                {running ? (lang==="ru"?"⏸ Пауза":"⏸ Pause") : (lang==="ru"?"▶ Старт":"▶ Start")}
-              </button>
-              <button onClick={reset}
-                style={{ padding:"9px 14px", borderRadius:12, border:"1px solid rgba(200,200,200,0.4)",
-                  background:"rgba(255,255,255,0.4)", color:THEME.textLight, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
-                ↺
-              </button>
-            </div>
-
-            {/* Sessions count */}
-            <div style={{ textAlign:"center", marginTop:10, fontSize:11, color:THEME.textLight }}>
-              {lang==="ru"
-                ? `Сессий сегодня: ${sessions} · ${sessions * WORK_MIN} мин фокуса`
-                : `Sessions: ${sessions} · ${sessions * WORK_MIN} min focused`}
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
+      {expandedPanel}
     </>
   );
 }
