@@ -197,34 +197,38 @@ const LOGIN_CSS = `
   .lg-card { width:300px; background:#fff; border-radius:24px; padding:36px 34px 32px;
     box-shadow:0 26px 64px rgba(58,72,98,.17),0 5px 16px rgba(58,72,98,.07);
     border:1px solid rgba(255,255,255,.85);
-    display:flex; flex-direction:column; align-items:center; }
+    display:flex; flex-direction:column; align-items:center; cursor:text; }
   .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,.07,.19,.97); }
   @keyframes lgShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-9px)}40%,60%{transform:translateX(9px)}}
   .lg-card-title { font-family:'Comfortaa',sans-serif; font-size:42px; font-weight:700;
     color:#2D4A6B; line-height:1; margin:0; letter-spacing:-.02em; }
+  .lg-card-title-ex { font-style:italic; display:inline-block; transform:skewX(-12deg); }
   .lg-card-sub { font-size:13px; color:#9AAAB8; font-weight:500; margin:10px 0 22px; text-align:center; }
 
-  /* pin dots */
-  .lg-dots { display:flex; gap:11px; margin-bottom:10px; }
-  .lg-dot { width:9px; height:9px; border-radius:50%;
-    background:rgba(45,74,107,.18); transition:.15s; }
-  .lg-dot.fill { background:#2D4A6B; }
-  .lg-stage.is-error .lg-dot.fill { background:#EE5B52; }
+  /* pin field */
+  .lg-pin-field { position:relative; width:200px; height:56px; border-radius:14px; background:#fff;
+    border:2px solid #FBD7C4; display:flex; align-items:center; justify-content:center; gap:14px;
+    cursor:text; transition:border-color .18s, box-shadow .18s; }
+  .lg-pin-field:focus-within { border-color:#FF8C42; box-shadow:0 0 0 4px rgba(255,140,66,.14); }
+  .lg-pin-field.err { border-color:#EE5B52; box-shadow:0 0 0 4px rgba(238,91,82,.13); }
+  .lg-pin-bullet { width:9px; height:9px; border-radius:50%; background:#2D4A6B; display:block; }
+  .lg-pin-bullet.err { background:#EE5B52; }
+  .lg-pin-empty { width:9px; height:9px; border-radius:50%; background:rgba(45,74,107,.18); display:block; }
+  .lg-pin-caret { width:2px; height:22px; background:#FF8C42; border-radius:2px; display:block;
+    animation:lgBlink 1.1s steps(1) infinite; }
+  @keyframes lgBlink{0%,50%{opacity:1}51%,100%{opacity:0}}
 
-  /* error text */
-  .lg-err { height:16px; font-size:12.5px; font-weight:600; color:#EE5B52;
-    margin-bottom:10px; opacity:0; transition:opacity .2s; }
-  .lg-stage.is-error .lg-err { opacity:1; }
+  .lg-err-txt { height:16px; font-size:12.5px; font-weight:600; color:#EE5B52;
+    margin-top:10px; opacity:0; transition:opacity .2s; }
+  .lg-stage.is-error .lg-err-txt { opacity:1; }
 
-  /* keypad */
-  .lg-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:16px; width:100%; }
-  .lg-key { height:52px; border:0; border-radius:14px; background:#F0F3F7;
-    color:#2D4A6B; font-size:20px; font-weight:600; font-family:inherit;
-    cursor:pointer; transition:.12s; display:flex; align-items:center; justify-content:center; }
-  .lg-key:hover { background:#E1E7EE; }
-  .lg-key.press { background:#D4DCE6; transform:scale(.96); }
-  .lg-key.ghost { background:transparent; pointer-events:none; }
-  .lg-key.act { font-size:16px; color:#9AAAB8; }
+  .lg-enter { margin-top:14px; width:200px; height:48px; border:0; border-radius:14px;
+    color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+    background:linear-gradient(180deg,#FFA45C,#FF8C42);
+    box-shadow:0 10px 22px rgba(255,140,66,.38),inset 0 1px 0 rgba(255,255,255,.35);
+    display:flex; align-items:center; justify-content:center; gap:8px; transition:.16s; }
+  .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,.46),inset 0 1px 0 rgba(255,255,255,.35); }
+  .lg-enter:active { transform:translateY(0); }
 
   /* success overlay */
   .lg-success { position:absolute; inset:0; z-index:10; display:flex;
@@ -294,15 +298,55 @@ function LgKeypad({ onKey, pressed }) {
 }
 
 // ── Login: Card (center piece) ───────────────────────────────────────
-function LgCard({ pin, error, pressed, onKey }) {
+function LgCard({ pin, error, onSubmit, onKey }) {
+  const inputRef = useRef(null);
   return (
     <div className="lg-card-zone">
-      <div className="lg-card">
-        <h1 className="lg-card-title">Мой день</h1>
+      <div className="lg-card" onClick={() => inputRef.current?.focus()}>
+        <h1 className="lg-card-title">Мой <span className="lg-card-title-ex">день</span></h1>
         <p className="lg-card-sub">Твоя личная система жизни</p>
-        <LgPinDots len={pin.length} error={error}/>
-        <div className="lg-err">Неверный пин-код</div>
-        <LgKeypad onKey={onKey} pressed={pressed}/>
+
+        {/* Pin field */}
+        <div className={'lg-pin-field' + (error ? ' err' : '')}>
+          {[0,1,2,3].map(i => {
+            const filled = i < pin.length;
+            const isActive = i === pin.length;
+            return (
+              <span key={i}>
+                {filled
+                  ? <span className={'lg-pin-bullet' + (error ? ' err' : '')}/>
+                  : isActive
+                    ? <span className="lg-pin-caret"/>
+                    : <span className="lg-pin-empty"/>
+                }
+              </span>
+            );
+          })}
+          <input
+            ref={inputRef}
+            type="tel"
+            inputMode="numeric"
+            maxLength={4}
+            value={pin}
+            onChange={e => {
+              const v = e.target.value.replace(/\D/g,'');
+              if (v.length <= 4) {
+                // simulate key presses
+                if (v.length > pin.length) onKey(v[v.length-1]);
+                else if (v.length < pin.length) onKey('back');
+              }
+            }}
+            autoFocus
+            style={{ position:'absolute', inset:0, opacity:0, border:0, background:'transparent', cursor:'text', fontSize:16 }}
+          />
+        </div>
+
+        <div className="lg-err-txt">Неверный пин-код</div>
+
+        <button className="lg-enter" onClick={onSubmit}>
+          Войти
+          <svg viewBox="0 0 24 24" fill="none" width={18} height={18}><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
       </div>
     </div>
   );
@@ -404,25 +448,30 @@ function LgAsideStats() {
 
 // ── Password Screen ──────────────────────────────────────────────────
 function PasswordScreen({ onUnlock }) {
-  const [pin, setPin]       = useState('');
-  const [error, setError]   = useState(false);
+  const [pin, setPin]         = useState('');
+  const [error, setError]     = useState(false);
   const [success, setSuccess] = useState(false);
-  const [shake, setShake]   = useState(false);
-  const [pressed, setPressed] = useState(null);
-  const [theme, setTheme]   = useState(() => localStorage.getItem("login_theme") || "quote");
+  const [shake, setShake]     = useState(false);
+  const [theme, setTheme]     = useState(() => localStorage.getItem("login_theme") || "quote");
   const timers = useRef([]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const after = (ms, fn) => { const t = setTimeout(fn, ms); timers.current.push(t); };
 
-  const flash = (k) => {
-    setPressed(k);
-    after(120, () => setPressed(null));
-  };
+  const handleSubmit = useCallback(() => {
+    if (success) return;
+    if (pin === CORRECT_PASSWORD) {
+      setSuccess(true);
+      after(1400, () => { localStorage.setItem("planner_auth","1"); onUnlock(); });
+    } else {
+      setShake(true); setError(true); setPin('');
+      after(420, () => setShake(false));
+      after(1500, () => setError(false));
+    }
+  }, [pin, success, onUnlock]);
 
   const handleKey = useCallback((k) => {
     if (success) return;
-    flash(k);
     if (k === 'back') { setError(false); setPin(p => p.slice(0,-1)); return; }
     setError(false);
     setPin(prev => {
@@ -449,10 +498,11 @@ function PasswordScreen({ onUnlock }) {
     const h = (e) => {
       if (e.key >= '0' && e.key <= '9') handleKey(e.key);
       else if (e.key === 'Backspace') handleKey('back');
+      else if (e.key === 'Enter') handleSubmit();
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [handleKey]);
+  }, [handleKey, handleSubmit]);
 
   const stageCls = 'lg-stage'
     + (error ? ' is-error' : '')
@@ -474,14 +524,14 @@ function PasswordScreen({ onUnlock }) {
       <div className="lg-blob b1"/>
       <div className="lg-blob b2"/>
       <div className="lg-blob b3"/>
-      <div className="lg-brand">Мой день</div>
+      <div className="lg-brand">Мой планер</div>
 
       {/* Main row */}
       <div className={'lg-row ' + (isCenter ? 'center' : 'split')}>
         {theme === 'quote' && <LgAsideQuote/>}
         {theme === 'anim'  && <LgAsideAnim/>}
         {theme === 'stats' && <LgAsideStats/>}
-        <LgCard pin={pin} error={error} pressed={pressed} onKey={handleKey}/>
+        <LgCard pin={pin} error={error} onKey={handleKey} onSubmit={handleSubmit}/>
       </div>
 
       {/* Success overlay */}
@@ -506,7 +556,7 @@ function PasswordScreen({ onUnlock }) {
         ))}
       </div>
 
-      <div className="lg-caption">MyPlanner v17 · Твой личный планировщик</div>
+
     </div>
   );
 }
