@@ -1689,9 +1689,9 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
                 cursor: isEditable ? "grab" : "default",
               }}>
               {/* Block header v17 */}
-              <div className="v17-block-head" style={{ "--v17-dot": col.accent, "--v17-chip": col.bg } as any}>
+              <div className="v17-block-head" style={{ "--v17-dot": col.accent, "--v17-chip": col.bg }}>
                 {isEditable && <span style={{ color:"#C8BFB0", fontSize:14, cursor:"grab", userSelect:"none", opacity:0.6 }}>⠿</span>}
-                <div className="v17-block-chip" style={{ "--v17-dot": col.accent } as any}>
+                <div className="v17-block-chip" style={{ "--v17-dot": col.accent }}>
                   <div className="v17-block-dot"/>
                   <span className="v17-block-name">
                     {isEditable
