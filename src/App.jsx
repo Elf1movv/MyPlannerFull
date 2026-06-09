@@ -495,13 +495,11 @@ function PasswordScreen({ onUnlock }) {
   // Physical keyboard
   useEffect(() => {
     const h = (e) => {
-      if (e.key >= '0' && e.key <= '9') handleKey(e.key);
-      else if (e.key === 'Backspace') handleKey('back');
-      else if (e.key === 'Enter') handleSubmit();
+      if (e.key === 'Enter') handleSubmit();
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [handleKey, handleSubmit]);
+  }, [handleSubmit]);
 
   const stageCls = 'lg-stage'
     + (error ? ' is-error' : '')
