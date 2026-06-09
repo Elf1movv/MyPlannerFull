@@ -2454,6 +2454,8 @@ function applyNewDay(data, today) {
   const todayHasRoutines = todayBlocks.some(b => b.tasks?.some(t => t.routine));
   const todayHasRealTasks = todayBlocks.some(b => b.tasks?.some(t => !t.routine));
 
+  console.log("[applyNewDay] td:", td, "last:", last, "todayData exists:", !!todayData, "hasReal:", todayHasRealTasks, "hasRoutines:", todayHasRoutines);
+
   if (!last || last === td) {
     if (!todayData) {
       return { ...data, days: { ...data.days, [td]: { blocks: DEFAULT_BLOCKS() } }, lastDate: td };
