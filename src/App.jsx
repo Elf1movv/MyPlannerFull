@@ -2761,6 +2761,22 @@ export default function App() {
     };
   }, []);
 
+  // Save on tab close/refresh — catches unsaved changes
+  useEffect(() => {
+    const handleUnload = () => {
+      if (latestData.current && !isFirstLoad.current && navigator.onLine) {
+        const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
+        // Use sendBeacon for reliable delivery on page close
+        const body = JSON.stringify([{ id: "main", data: toSave, updated_at: new Date().toISOString() }]);
+        navigator.sendBeacon
+          ? navigator.sendBeacon(SUPABASE_URL + "/rest/v1/planner_data?id=eq.main", new Blob([body], { type: "application/json" }))
+          : saveToCloud(toSave).catch(() => {});
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
   // Save to localStorage immediately; debounce cloud save 2s
   useEffect(() => {
     localStorage.setItem("dailyplanner_v3", JSON.stringify(appData));
@@ -2779,7 +2795,7 @@ export default function App() {
         enqueueOfflineSave(toSave);
         setOfflinePending(true);
       }
-    }, 2000);
+    }, 1000);
   }, [appData]);
 
   // On mount: load from cloud, merge intelligently — runs once
@@ -2837,7 +2853,13 @@ export default function App() {
 
       setSyncing(false);
       setLastSync(new Date());
-      setTimeout(() => { isFirstLoad.current = false; }, 600);
+      setTimeout(() => {
+        isFirstLoad.current = false;
+        // Force immediate save after load to ensure cloud is up to date
+        if (navigator.onLine && latestData.current) {
+          saveToCloud(latestData.current).catch(() => {});
+        }
+      }, 1500);
     })();
   }, []);
 
@@ -2873,7 +2895,7 @@ export default function App() {
           setLastSync(new Date());
         }
       } catch {}
-    }, 90000);
+    }, 30000);
     return () => clearInterval(id);
   }, []); // stable — never recreates
 
