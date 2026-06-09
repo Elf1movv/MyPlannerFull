@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // ── Supabase Sync ───────────────────────────────────────────────────
 const SUPABASE_URL = "https://mahvuymxoddkiquhcngx.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1haHZ1eW14b2Rka2lxdWhjbmd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzMwMzksImV4cCI6MjA5NDc0OTAzOX0.ZTAVqbUI5ihqbSWnIx8f9TWo6aN8uZHLXBYnr_kwK8Q";
+const SUPABASE_KEY = "sb_publishable_MbWRZ_V-R8BSEa_4GECblg_g7jdegC8";
 
 async function sbFetch(method, body) {
   const opts = {
