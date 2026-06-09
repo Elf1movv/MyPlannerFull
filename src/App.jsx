@@ -25,11 +25,14 @@ async function sbFetch(method, body) {
 async function loadFromCloud() {
   try {
     const rows = await sbFetch("GET");
+    console.log("[SYNC] Cloud response:", JSON.stringify(rows)?.slice(0, 200));
     if (rows && rows.length > 0) {
       const d = rows[0].data;
+      console.log("[SYNC] Cloud lastDate:", d?.lastDate, "days:", Object.keys(d?.days || {}));
       if (d && Object.keys(d).length > 0) return d;
     }
-  } catch(e) { console.warn("Cloud load failed:", e); }
+    console.log("[SYNC] No cloud data found");
+  } catch(e) { console.warn("[SYNC] Cloud load failed:", e); }
   return null;
 }
 
@@ -2809,8 +2812,11 @@ export default function App() {
       setAppData(local => {
         // No cloud data — use local as-is
         if (!cloudData || !cloudData.lastDate) {
+          console.log("[SYNC] No cloud data, using local");
           return applyNewDay(local, today);
         }
+
+        console.log("[SYNC] Got cloud data, lastDate:", cloudData.lastDate);
 
         const localV = local.version || 0;
         const cloudV = cloudData.version || 0;
@@ -2821,6 +2827,8 @@ export default function App() {
           .flatMap(d => (d.blocks || []).flatMap(b => b.tasks || []))
           .filter(t => !t.routine).length;
         const localIsEmpty = !hasSavedData || localRealTasks === 0;
+
+        console.log("[SYNC] hasSavedData:", hasSavedData, "localRealTasks:", localRealTasks, "localIsEmpty:", localIsEmpty);
 
         // Fresh install — always use cloud
         if (localIsEmpty) {
