@@ -2730,7 +2730,6 @@ function PomodoroTimer({ lang }) {
 
   return (
     <>
-      {widget}
       {floatBtn}
       {expandedPanel}
     </>
