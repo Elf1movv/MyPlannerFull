@@ -2791,30 +2791,47 @@ export default function App() {
       const today = getLocalToday();
 
       setAppData(local => {
-        let base = local;
-        if (cloudData && cloudData.lastDate) {
-          const localV = local.version || 0;
-          const cloudV = cloudData.version || 0;
-          const localTodayBlocks = local.days[today]?.blocks || [];
-          const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
-          const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
-          const localCount = countReal(localTodayBlocks);
-          const cloudCount = countReal(cloudTodayBlocks);
-
-          base = {
-            ...( cloudV >= localV ? cloudData : local ),
-            version: Math.max(localV, cloudV, DATA_VERSION),
-            goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
-            events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
-            habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
-            days: {
-              ...(cloudV >= localV ? cloudData.days : local.days),
-              [today]: localCount >= cloudCount
-                ? (local.days[today] || cloudData.days?.[today])
-                : (cloudData.days?.[today] || local.days[today])
-            }
-          };
+        // No cloud data — use local as-is
+        if (!cloudData || !cloudData.lastDate) {
+          return applyNewDay(local, today);
         }
+
+        const localV = local.version || 0;
+        const cloudV = cloudData.version || 0;
+
+        // Detect fresh install: no saved data OR only default habits/tasks
+        const hasSavedData = !!localStorage.getItem("dailyplanner_v3");
+        const localRealTasks = Object.values(local.days || {})
+          .flatMap(d => (d.blocks || []).flatMap(b => b.tasks || []))
+          .filter(t => !t.routine).length;
+        const localIsEmpty = !hasSavedData || localRealTasks === 0;
+
+        // Fresh install — always use cloud
+        if (localIsEmpty) {
+          return applyNewDay(cloudData, today);
+        }
+
+        // Both have real data — smart merge
+        const localTodayBlocks = local.days[today]?.blocks || [];
+        const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
+        const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
+        const localCount = countReal(localTodayBlocks);
+        const cloudCount = countReal(cloudTodayBlocks);
+
+        const base = {
+          ...( cloudV >= localV ? cloudData : local ),
+          version: Math.max(localV, cloudV, DATA_VERSION),
+          goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
+          events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
+          habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
+          days: {
+            ...(cloudV >= localV ? cloudData.days : local.days),
+            [today]: localCount >= cloudCount
+              ? (local.days[today] || cloudData.days?.[today])
+              : (cloudData.days?.[today] || local.days[today])
+          }
+        };
+
         return applyNewDay(base, today);
       });
 
@@ -3084,7 +3101,7 @@ export default function App() {
 
   return (
     <div className="animated-bg" style={{ minHeight: "100vh", fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" /> rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
       <style>{BG_ANIM_STYLE}</style>
 
       {/* New day modal */}
