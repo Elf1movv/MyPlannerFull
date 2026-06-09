@@ -2812,8 +2812,8 @@ export default function App() {
       const cloudData = navigator.onLine ? await loadFromCloud() : null;
       const today = getLocalToday();
 
+      // Compute new state based on cloud + local, then set directly
       setAppData(local => {
-        // No cloud data — use local as-is
         if (!cloudData || !cloudData.lastDate) {
           console.log("[SYNC] No cloud data, using local");
           return applyNewDay(local, today);
@@ -2821,21 +2821,17 @@ export default function App() {
 
         console.log("[SYNC] Got cloud data, lastDate:", cloudData.lastDate);
 
-        const localV = local.version || 0;
-        const cloudV = cloudData.version || 0;
-
-        // Detect fresh install: check if localStorage was empty BEFORE app initialized
-        // We use a separate flag set at load time
         const localIsEmpty = !window.__hadSavedData__;
-
         console.log("[SYNC] hadSavedData:", window.__hadSavedData__, "localIsEmpty:", localIsEmpty);
 
-        // Fresh install — always use cloud
         if (localIsEmpty) {
-          return applyNewDay(cloudData, today);
+          const result = applyNewDay(cloudData, today);
+          console.log("[SYNC] Using cloud (fresh install), result days:", Object.keys(result.days || {}));
+          return result;
         }
 
-        // Both have real data — smart merge
+        const localV = local.version || 0;
+        const cloudV = cloudData.version || 0;
         const localTodayBlocks = local.days[today]?.blocks || [];
         const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
         const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
@@ -2856,7 +2852,9 @@ export default function App() {
           }
         };
 
-        return applyNewDay(base, today);
+        const result = applyNewDay(base, today);
+        console.log("[SYNC] Smart merge result days:", Object.keys(result.days || {}), "today tasks:", result.days[today]?.blocks?.flatMap(b=>b.tasks||[]).map(t=>t.names?.ru));
+        return result;
       });
 
       setSyncing(false);
