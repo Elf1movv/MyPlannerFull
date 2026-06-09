@@ -651,6 +651,7 @@ const DEFAULT_HABITS = () => ([
 function loadAppData() {
   try {
     const raw = localStorage.getItem("dailyplanner_v3");
+    window.__hadSavedData__ = !!raw;  // remember if data existed BEFORE init
     if (raw) {
       const parsed = JSON.parse(raw);
       // Add version if missing (migration from older versions)
@@ -2821,14 +2822,11 @@ export default function App() {
         const localV = local.version || 0;
         const cloudV = cloudData.version || 0;
 
-        // Detect fresh install: no saved data OR only default habits/tasks
-        const hasSavedData = !!localStorage.getItem("dailyplanner_v3");
-        const localRealTasks = Object.values(local.days || {})
-          .flatMap(d => (d.blocks || []).flatMap(b => b.tasks || []))
-          .filter(t => !t.routine).length;
-        const localIsEmpty = !hasSavedData || localRealTasks === 0;
+        // Detect fresh install: check if localStorage was empty BEFORE app initialized
+        // We use a separate flag set at load time
+        const localIsEmpty = !window.__hadSavedData__;
 
-        console.log("[SYNC] hasSavedData:", hasSavedData, "localRealTasks:", localRealTasks, "localIsEmpty:", localIsEmpty);
+        console.log("[SYNC] hadSavedData:", window.__hadSavedData__, "localIsEmpty:", localIsEmpty);
 
         // Fresh install — always use cloud
         if (localIsEmpty) {
