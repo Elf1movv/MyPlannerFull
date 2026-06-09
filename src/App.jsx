@@ -940,69 +940,67 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
   const CHART_COLORS = ["#378ADD","#1D9E75","#FF8C42","#D4537E","#7F77DD","#D4A017","#E53935","#00ACC1","#9C27B0","#FF5722","#7CB342","#F9A825"];
 
   return (
-    <div className="v17-habits">
-      {/* Header v17 */}
-      <div className="v17-habits-head">
-        <div className="v17-habits-icon">🔄</div>
-        <span className="v17-habits-title">{L.habits}</span>
-        <span className="v17-habits-grid-lbl">{L.habitsGrid}</span>
+    <div className="hb-card">
+      {/* Header — exact design */}
+      <div className="hb-card-hd">
+        <div className="hb-card-ic">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M19 12a7 7 0 01-12 5M5 12a7 7 0 0112-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M17 3v4h-4M7 21v-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <span className="hb-card-title">{L.habits}</span>
+        <button className="hb-card-link">{L.habitsGrid}</button>
       </div>
 
-      <div className="v17-habits-body">
-        {/* Column headers */}
-        <div style={{ display:"grid", gridTemplateColumns:"180px repeat(" + days.length + ", 1fr)", gap:3, marginBottom:6, minWidth: period==="month" ? 860 : "auto" }}>
-          <div/>
+      {/* Table */}
+      <div style={{ overflowX:"auto" }}>
+        <div className={"htable " + period}>
+          <div className="corner"/>
           {dayLabels.map((l, i) => (
-            <div key={i} className="v17-col-hdr" style={{ fontSize: period==="month" ? 9 : 10 }}>{l}</div>
+            <div key={i} className="col-hd">{l}</div>
           ))}
+
+          {habits.map(habit => {
+            const streak = getStreak(habit.id);
+            return (
+              <React.Fragment key={habit.id}>
+                <div className="h-row" style={{ gridColumn:1 }}>
+                  <div className="h-dot" style={{ background: habit.color }}/>
+                  <EditableTitle value={habit.names[lang]||habit.names.ru}
+                    onChange={n => onRenameHabit(habit.id, {...habit.names, [lang]:n})}
+                    style={{ fontSize:14.5, color:"#2D4A6B", fontWeight:600, flex:1, minWidth:0 }}/>
+                  {streak > 0 && <span style={{ fontSize:11, color:habit.color, fontWeight:600, whiteSpace:"nowrap" }}>🔥{streak}</span>}
+                  <button className="h-del" onClick={() => onDeleteHabit(habit.id)}>
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+                {days.map((dayKey, ci) => {
+                  if (period === "year") {
+                    const { done, total } = getMonthPct(habit.id, dayKey);
+                    const pct = total ? Math.round((done/total)*100) : 0;
+                    return (
+                      <div key={ci} className={"hcell" + (pct>0?" done":"")}
+                        style={{ "--cc": habit.color, background: pct>0 ? habit.color : "rgba(255,255,255,0.45)", borderColor: habit.color }}
+                        title={pct + "%"}>
+                      </div>
+                    );
+                  }
+                  const isDone = habitLog[dayKey]?.[habit.id] || false;
+                  const isFuture = dayKey > TODAY;
+                  return (
+                    <div key={ci}
+                      onClick={() => !isFuture && onToggle(dayKey, habit.id)}
+                      className={"hcell" + (isDone?" done":"") + (isFuture?" future":"") + (dayKey===TODAY?" today":"")}
+                      style={{ "--cc": habit.color, background: isDone ? habit.color : "rgba(255,255,255,0.45)", borderColor: dayKey===TODAY ? habit.color : "rgba(45,74,107,0.12)" }}
+                    />
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
         </div>
 
-        {/* Habit rows v17 */}
-        {habits.map(habit => {
-          const streak = getStreak(habit.id);
-          return (
-            <div key={habit.id} className="v17-habit-row" style={{ display:"grid", gridTemplateColumns:"180px repeat(" + days.length + ", 1fr)", gap:3, minWidth: period==="month" ? 860 : "auto", alignItems:"center" }}>
-              <div className="v17-habit-label">
-                <div className="v17-habit-dot" style={{ background: habit.color }}/>
-                <EditableTitle value={habit.names[lang]||habit.names.ru}
-                  onChange={n => onRenameHabit(habit.id, {...habit.names, [lang]:n})}
-                  style={{ fontSize:13, color:"#2D4A6B", fontWeight:500, flex:1, minWidth:0 }}/>
-                {streak > 0 && <span className="v17-habit-streak" style={{ color: habit.color }}>🔥{streak}</span>}
-                <button className="v17-habit-del" onClick={() => onDeleteHabit(habit.id)}>×</button>
-              </div>
-              {days.map((dayKey, ci) => {
-                if (period === "year") {
-                  const { done, total } = getMonthPct(habit.id, dayKey);
-                  const pct = total ? Math.round((done/total)*100) : 0;
-                  return (
-                    <div key={ci} className="v17-cell"
-                      style={{ background: pct>0 ? habit.color+Math.round(pct*2.55).toString(16).padStart(2,"0") : "rgba(45,74,107,0.05)" }}
-                      title={pct + "%"}>
-                      <span style={{ fontSize:9, color: pct>60?"#fff":"#9AAAB8" }}>{pct>0 ? pct+"%" : ""}</span>
-                    </div>
-                  );
-                }
-                const isDone = habitLog[dayKey]?.[habit.id] || false;
-                const isFuture = dayKey > TODAY;
-                return (
-                  <div key={ci}
-                    onClick={() => !isFuture && onToggle(dayKey, habit.id)}
-                    className={"v17-cell" + (isDone?" done":"") + (isFuture?" future":"") + (dayKey===TODAY?" today":"")}
-                    style={{
-                      background: isDone ? habit.color : "rgba(45,74,107,0.05)",
-                      borderColor: dayKey===TODAY ? habit.color : "rgba(45,74,107,0.08)",
-                    }}>
-                    {isDone && <span className="v17-cell-check" style={{ fontSize: period==="month" ? 8 : 11 }}>✓</span>}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-
-        {/* Add habit v17 */}
+        {/* Add habit */}
         {addingHabit ? (
-          <div className="v17-habit-form">
+          <div className="hb-form">
             <input autoFocus value={newHabitName} onChange={e=>setNewHabitName(e.target.value)}
               onKeyDown={e=>{ if(e.key==="Escape")setAddingHabit(false); }}
               placeholder={L.newHabit}/>
@@ -1018,30 +1016,28 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
               style={{ padding:"7px 11px", borderRadius:10, border:"1px solid #E8EEF4", background:"#fff", color:"#9AAAB8", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>{L.cancel}</button>
           </div>
         ) : (
-          <button className="v17-add-habit" onClick={()=>setAddingHabit(true)}>
+          <button className="add-habit" onClick={()=>setAddingHabit(true)}>
             {L.addHabit}
           </button>
         )}
       </div>
 
-      {/* Chart section v17 */}
+      {/* Progress + chart */}
       {habits.length > 0 && (
-        <div className="v17-chart-section">
-          <div className="v17-chart-head">
-            <span className="v17-chart-lbl">
-              {lang==="ru" ? "Общий прогресс привычек" : "Total habit progress"}
-            </span>
-            <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+        <div className="hb-prog">
+          <div className="hb-prog-hd">
+            <b>{lang==="ru" ? "Общий прогресс привычек" : "Total habit progress"}</b>
+            <div className="hb-prog-dots">
               {CHART_COLORS.map(c => (
-                <div key={c} onClick={() => setChartColor(c)}
-                  className={"v17-chart-dot" + (chartColor===c?" sel":"")}
+                <span key={c} onClick={() => setChartColor(c)}
+                  className={chartColor===c?"sel":""}
                   style={{ background:c }}/>
               ))}
             </div>
           </div>
           <HabitAreaChart data={combinedData} color={chartColor}/>
           {totalPossible > 0 && (
-            <div className="v17-chart-completed">
+            <div className="chart-foot">
               {lang==="ru"?"Выполнено":"Completed"}: {totalDone} из {totalPossible} ({Math.round(totalDone/totalPossible*100)}%)
             </div>
           )}
@@ -1743,26 +1739,29 @@ function CalendarView({ appData, lang, selectedDay, onSelectDay }) {
     cells.push({ key, dn, p, isToday:key===TODAY, isFuture:key>TODAY, isSelected:key===selectedDay });
   }
   return (
-    <div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <button onClick={()=>setVd(new Date(yr,mo-1,1))} style={{ border:"1px solid rgba(255,255,255,0.7)",borderRadius:8,background:"rgba(255,255,255,0.5)",padding:"4px 14px",cursor:"pointer",fontSize:18,color:THEME.text }}>‹</button>
-        <span style={{ fontSize:15,fontWeight:600,color:THEME.text }}>{L.months[mo]} {yr}</span>
-        <button onClick={()=>setVd(new Date(yr,mo+1,1))} style={{ border:"1px solid rgba(255,255,255,0.7)",borderRadius:8,background:"rgba(255,255,255,0.5)",padding:"4px 14px",cursor:"pointer",fontSize:18,color:THEME.text }}>›</button>
+    <div className="cal-mini">
+      <div className="cal-mini-hd">
+        <button className="cal-nav" onClick={()=>setVd(new Date(yr,mo-1,1))}>
+          <svg viewBox="0 0 20 20" fill="none"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+        <b>{L.months[mo]} {yr}</b>
+        <button className="cal-nav" onClick={()=>setVd(new Date(yr,mo+1,1))}>
+          <svg viewBox="0 0 20 20" fill="none"><path d="M7.5 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
       </div>
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4 }}>
-        {L.days.map(d=><div key={d} style={{ textAlign:"center",fontSize:11,color:THEME.textLight,fontWeight:500,padding:"4px 0" }}>{d}</div>)}
+      <div className="cal-wd-row">
+        {L.days.map(d => <span key={d}>{d}</span>)}
       </div>
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3 }}>
-        {cells.map((cell,i)=>{
-          if(!cell) return <div key={i}/>;
-          const bg=cell.isSelected?"#1a1a18":cell.p!==null?dayBgColor(cell.p):"rgba(255,255,255,0.4)";
-          const fg=cell.isSelected?"#fff":cell.p!==null?dayFgColor(cell.p):THEME.textLight;
+      <div className="cal-days">
+        {cells.map((cell,i) => {
+          if (!cell) return <div key={i} className="cal-day empty"/>;
+          const hasTasks = cell.p !== null;
           return (
             <div key={cell.key} onClick={()=>onSelectDay(cell.key)}
-              style={{ aspectRatio:"1",borderRadius:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",background:bg,border:cell.isToday&&!cell.isSelected?`2px solid ${THEME.sunsetApricot}`:"1px solid rgba(255,255,255,0.6)",transition:"all 0.15s" }}>
-              <span style={{ fontSize:12,fontWeight:cell.isToday?600:400,color:fg }}>{cell.dn}</span>
-              {cell.p!==null&&!cell.isSelected&&<span style={{ fontSize:8,color:fg,opacity:0.8 }}>{cell.p}%</span>}
-              {cell.isFuture&&cell.p===null&&<span style={{ fontSize:9,color:"rgba(200,200,200,0.8)" }}>＋</span>}
+              className={"cal-day" + (cell.isToday?" today":"") + (cell.isSelected?" sel":"") + (cell.key<TODAY&&!cell.isToday?" past":"")}>
+              {hasTasks && !cell.isToday && <div className="tdot"/>}
+              <span className="dn">{cell.dn}</span>
+              {cell.isToday && <span className="sub">{lang==="ru"?"сег.":"today"}</span>}
             </div>
           );
         })}
@@ -1995,54 +1994,39 @@ function MonthGoalsCard({ monthIdx, year, goals, lang, onAdd, onDelete, onSetSta
 
   if (compact) {
     const unclosed = monthGoals.filter(g => g.status === "pending").length;
+    const now2 = new Date();
+    const isCurrentMonth = monthIdx === now2.getMonth() && year === now2.getFullYear();
     return (
-      <div style={{ background:"rgba(255,255,255,0.55)", border:`2px solid ${isPastMonth && unclosed > 0 ? "rgba(226,75,74,0.3)" : color+"30"}`, borderRadius:16, padding:"16px 18px", backdropFilter:"none", minHeight:120, position:"relative" }}>
-        {/* Past month with unclosed goals badge */}
-        {isPastMonth && unclosed > 0 && (
-          <div style={{ position:"absolute", top:-6, right:-6, width:18, height:18, borderRadius:"50%", background:"#E24B4A", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <span style={{ color:"#fff", fontSize:10, fontWeight:700 }}>{unclosed}</span>
-          </div>
-        )}
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-          <div style={{ width:10, height:10, borderRadius:"50%", background:color, flexShrink:0 }}/>
-          <span style={{ fontSize:13, fontWeight:600, color:THEME.text, flex:1 }}>{name}</span>
-          {monthGoals.length > 0 && <span style={{ fontSize:11, color:color, fontWeight:600 }}>{pct}%</span>}
+      <div className={"gl-mcard" + (isCurrentMonth?" current":"") + (isPastMonth?" past":"")}>
+        {unclosed > 0 && isPastMonth && <div className="gl-mbadge">{unclosed}</div>}
+        {monthGoals.length > 0 && <div className="gl-mpct">{pct}%</div>}
+        <div className="gl-mcard-hd">
+          <div className="gl-mdot" style={{ background: color }}/>
+          <span className="gl-mname">{name}</span>
         </div>
-        {monthGoals.length > 0 && (
-          <div style={{ height:3, background:"rgba(255,255,255,0.5)", borderRadius:2, overflow:"hidden", marginBottom:8 }}>
-            <div style={{ height:"100%", width:`${pct}%`, background:color, borderRadius:2, transition:"width 0.5s" }}/>
-          </div>
-        )}
-        <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:8 }}>
+        <div className="gl-mgoals">
           {monthGoals.slice(0,3).map(g => (
-            <div key={g.id} style={{ display:"flex", alignItems:"center", gap:6 }}>
-              {/* Allow status toggle on past months too */}
-              <button onClick={()=>onSetStatus(period, g.id, g.status==="done"?"pending":"done")}
-                style={{ width:12, height:12, borderRadius:"50%", flexShrink:0, border:`1.5px solid ${g.status==="done"?"#1D9E75":g.status==="failed"?"#E24B4A":color}`, background:g.status==="done"?"#1D9E75":g.status==="failed"?"#E24B4A":"transparent", cursor:"pointer", padding:0 }}/>
-              <span style={{ fontSize:11, color: g.status==="done"?THEME.textLight:THEME.text, textDecoration:g.status!=="pending"?"line-through":"none", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{g.text}</span>
-              {isPastMonth && g.status==="pending" && (
-                <button onClick={()=>onSetStatus(period, g.id, "failed")}
-                  title="Не выполнено"
-                  style={{ width:12, height:12, borderRadius:"50%", border:"1.5px solid #E24B4A", background:"transparent", cursor:"pointer", padding:0, flexShrink:0 }}/>
-              )}
+            <div key={g.id} className={"gl-mgoal" + (g.status==="done"?" done":g.status==="failed"?" failed":"")}
+              onClick={()=>onSetStatus(period, g.id, g.status==="done"?"pending":"done")}>
+              <div className="gl-mg-chk">
+                {g.status==="done" && <svg viewBox="0 0 12 12" fill="none" width={10} height={10}><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>}
+              </div>
+              <span className="gl-mg-text">{g.text}</span>
             </div>
           ))}
-          {monthGoals.length > 3 && <span style={{ fontSize:10, color:THEME.textLight }}>+{monthGoals.length-3} {lang==="ru"?"ещё":"more"}</span>}
+          {monthGoals.length > 3 && <span style={{ fontSize:10, color:"#9AAAB8" }}>+{monthGoals.length-3} {lang==="ru"?"ещё":"more"}</span>}
         </div>
         {!isPastMonth && (
-          <button onClick={()=>setAdding(a=>!a)}
-            style={{ fontSize:11, color:color, background:"transparent", border:`1px dashed ${color}80`, borderRadius:8, cursor:"pointer", padding:"3px 10px", fontFamily:"inherit" }}>
+          <button className="gl-madd" onClick={()=>setAdding(a=>!a)} style={{ marginTop:8 }}>
             + {lang==="ru"?"цель":"goal"}
           </button>
         )}
         {adding && (
-          <div style={{ marginTop:8 }}>
-            <input autoFocus value={newText} onChange={e=>setNewText(e.target.value)}
-              onKeyDown={e=>{ if(e.key==="Enter")addGoal(); if(e.key==="Escape")setAdding(false); }}
-              onBlur={()=>{ if(newText.trim())addGoal(); else setAdding(false); }}
-              placeholder={lang==="ru"?"Новая цель...":"New goal..."}
-              style={{ width:"100%", boxSizing:"border-box", border:"1px solid rgba(200,200,200,0.5)", borderRadius:8, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"rgba(255,255,255,0.8)" }}/>
-          </div>
+          <input autoFocus value={newText} onChange={e=>setNewText(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter")addGoal(); if(e.key==="Escape")setAdding(false); }}
+            onBlur={()=>{ if(newText.trim())addGoal(); else setAdding(false); }}
+            placeholder={lang==="ru"?"Новая цель...":"New goal..."}
+            style={{ width:"100%", boxSizing:"border-box", border:"1px solid #E8EEF4", borderRadius:8, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#F7FAFC", marginTop:6 }}/>
         )}
       </div>
     );
@@ -2050,46 +2034,37 @@ function MonthGoalsCard({ monthIdx, year, goals, lang, onAdd, onDelete, onSetSta
 
   // Full card for single month view
   return (
-    <div style={{ background:"rgba(255,255,255,0.55)", border:`2px solid ${color}40`, borderRadius:20, padding:"22px 24px", backdropFilter:"none" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-        <div style={{ width:12, height:12, borderRadius:"50%", background:color }}/>
-        <span style={{ fontSize:17, fontWeight:700, color:THEME.text }}>{name} {year}</span>
-        {monthGoals.length > 0 && (
-          <span style={{ fontSize:12, color:color, fontWeight:600, marginLeft:"auto" }}>{done}/{monthGoals.length} · {pct}%</span>
-        )}
+    <div className="gl-card month-card" style={{ borderColor: color + "45" }}>
+      {monthGoals.length > 0 && <div className="gl-badge">{monthGoals.length}</div>}
+      <div className="gl-card-head">
+        <div className="gl-cdot" style={{ background: color }}/>
+        <span className="gl-card-h">{name} {year}</span>
+        {monthGoals.length > 0 && <span className="gl-pct-top">{done} из {monthGoals.length} · {pct}%</span>}
       </div>
-      {monthGoals.length > 0 && (
-        <div style={{ height:4, background:"rgba(255,255,255,0.5)", borderRadius:3, overflow:"hidden", marginBottom:16 }}>
-          <div style={{ height:"100%", width:`${pct}%`, background:color, borderRadius:3, transition:"width 0.5s" }}/>
-        </div>
+      {monthGoals.length === 0 && !adding && (
+        <p className="gl-card-hint">{lang==="ru"?"Добавьте цели на этот месяц":"Add goals for this month"}</p>
       )}
-      <div style={{ marginBottom:8 }}>
+      <div className="gl-list">
         <GoalsList goals={monthGoals} period={period} lang={lang}
           onDelete={onDelete} onSetStatus={onSetStatus} onUpdateText={onUpdateText} onReorder={onReorder}/>
-        {monthGoals.length === 0 && !adding && (
-          <div style={{ fontSize:13, color:THEME.textLight, fontStyle:"italic", padding:"8px 0" }}>
-            {lang==="ru"?"Добавьте цели на этот месяц":"Add goals for this month"}
-          </div>
-        )}
       </div>
       {adding ? (
         <div style={{ display:"flex", gap:8, marginTop:8 }}>
           <input autoFocus value={newText} onChange={e=>setNewText(e.target.value)}
             onKeyDown={e=>{ if(e.key==="Enter")addGoal(); if(e.key==="Escape"){setAdding(false);setNewText("");} }}
             placeholder={lang==="ru"?"Новая цель...":"New goal..."}
-            style={{ flex:1, border:"1px solid rgba(200,200,200,0.5)", borderRadius:10, padding:"7px 12px", fontSize:13, fontFamily:"inherit", outline:"none", background:"rgba(255,255,255,0.8)" }}/>
+            style={{ flex:1, border:"1px solid #E8EEF4", borderRadius:10, padding:"7px 12px", fontSize:13, fontFamily:"inherit", outline:"none", background:"#F7FAFC" }}/>
           <button onClick={addGoal}
-            style={{ padding:"6px 16px", borderRadius:10, border:"none", background:color, color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
+            style={{ padding:"7px 16px", borderRadius:10, border:"none", background:color, color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
             {lang==="ru"?"Добавить":"Add"}
           </button>
           <button onClick={()=>{setAdding(false);setNewText("");}}
-            style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(200,200,200,0.4)", background:"rgba(255,255,255,0.4)", color:THEME.textLight, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+            style={{ padding:"7px 10px", borderRadius:10, border:"1px solid #E8EEF4", background:"#fff", color:"#9AAAB8", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
             {lang==="ru"?"Отмена":"Cancel"}
           </button>
         </div>
       ) : (
-        <button onClick={()=>setAdding(true)}
-          style={{ fontSize:13, color:color, background:"transparent", border:`1px dashed ${color}80`, borderRadius:10, cursor:"pointer", padding:"6px 16px", fontFamily:"inherit", marginTop:4 }}>
+        <button className="gl-add" onClick={()=>setAdding(true)}>
           + {lang==="ru"?"Добавить цель":"Add goal"}
         </button>
       )}
@@ -2142,48 +2117,47 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
       {isYearView && (
         <div>
           {/* Цели года */}
-          <div style={{ background:"rgba(255,255,255,0.55)", border:"2px solid rgba(255,176,124,0.3)", borderRadius:20, padding:"20px 24px", backdropFilter:"none", marginBottom:24 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <div className="gl-card" style={{ marginBottom:24, borderColor:"rgba(255,176,124,0.3)" }}>
+            <div className="gl-card-head">
               <span style={{ fontSize:22 }}>🏆</span>
-              <span style={{ fontSize:16, fontWeight:700, color:THEME.text }}>{lang==="ru"?`Цели ${year} года`:`Goals for ${year}`}</span>
+              <span className="gl-card-h">{lang==="ru"?`Цели ${year} года`:`Goals for ${year}`}</span>
               {yearGoals.length > 0 && (
-                <span style={{ fontSize:12, color:THEME.sunsetDeep, fontWeight:600, marginLeft:"auto" }}>
-                  {yearGoals.filter(g=>g.status==="done").length}/{yearGoals.length}
+                <span className="gl-pct-top" style={{ color:"#FF8C42" }}>
+                  {yearGoals.filter(g=>g.status==="done").length} из {yearGoals.length}
                 </span>
               )}
             </div>
-            <GoalsList goals={yearGoals} period={yearKey} lang={lang}
-              onDelete={onDelete} onSetStatus={onSetStatus} onUpdateText={onUpdateText} onReorder={onReorder}/>
             {yearGoals.length === 0 && !addingYear && (
-              <div style={{ fontSize:13, color:THEME.textLight, fontStyle:"italic", padding:"4px 0 8px" }}>
-                {lang==="ru"?"Добавьте главные цели на год":"Add your main goals for the year"}
-              </div>
+              <p className="gl-card-hint">{lang==="ru"?"Добавьте главные цели на год":"Add your main goals for the year"}</p>
             )}
+            <div className="gl-list">
+              <GoalsList goals={yearGoals} period={yearKey} lang={lang}
+                onDelete={onDelete} onSetStatus={onSetStatus} onUpdateText={onUpdateText} onReorder={onReorder}/>
+            </div>
             {addingYear ? (
               <div style={{ display:"flex", gap:8, marginTop:10 }}>
                 <input autoFocus value={newYearText} onChange={e=>setNewYearText(e.target.value)}
                   onKeyDown={e=>{ if(e.key==="Enter")addYearGoal(); if(e.key==="Escape"){setAddingYear(false);setNewYearText("");} }}
                   placeholder={lang==="ru"?"Новая цель на год...":"New year goal..."}
-                  style={{ flex:1, border:"1px solid rgba(200,200,200,0.5)", borderRadius:10, padding:"7px 12px", fontSize:13, fontFamily:"inherit", outline:"none", background:"rgba(255,255,255,0.8)" }}/>
+                  style={{ flex:1, border:"1px solid #E8EEF4", borderRadius:10, padding:"7px 12px", fontSize:13, fontFamily:"inherit", outline:"none", background:"#F7FAFC" }}/>
                 <button onClick={addYearGoal}
-                  style={{ padding:"6px 16px", borderRadius:10, border:"none", background:THEME.sunsetApricot, color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
+                  style={{ padding:"7px 16px", borderRadius:10, border:"none", background:"#FF8C42", color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
                   {lang==="ru"?"Добавить":"Add"}
                 </button>
                 <button onClick={()=>{setAddingYear(false);setNewYearText("");}}
-                  style={{ padding:"6px 10px", borderRadius:10, border:"1px solid rgba(200,200,200,0.4)", background:"rgba(255,255,255,0.4)", color:THEME.textLight, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                  style={{ padding:"7px 10px", borderRadius:10, border:"1px solid #E8EEF4", background:"#fff", color:"#9AAAB8", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
                   {lang==="ru"?"Отмена":"Cancel"}
                 </button>
               </div>
             ) : (
-              <button onClick={()=>setAddingYear(true)}
-                style={{ fontSize:13, color:THEME.sunsetDeep, background:"transparent", border:`1px dashed rgba(255,140,66,0.5)`, borderRadius:10, cursor:"pointer", padding:"5px 14px", fontFamily:"inherit", marginTop:4 }}>
+              <button className="gl-add orange" onClick={()=>setAddingYear(true)} style={{ marginTop:4 }}>
                 + {lang==="ru"?"Добавить цель года":"Add year goal"}
               </button>
             )}
           </div>
 
-          {/* Сетка 12 месяцев */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:14 }}>
+          {/* Сетка 12 месяцев v17 */}
+          <div className="gl-mgrid">
             {Array.from({length:12},(_,i)=>i).map(m => (
               <MonthGoalsCard key={m}
                 monthIdx={m} year={year} goals={goals} lang={lang}
@@ -3246,10 +3220,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* MINI view */}
+            {/* MINI view v17 */}
             {calView === "mini" && (
-              <div style={{ display:"grid", gridTemplateColumns:"360px 1fr", gap:20, alignItems:"start" }}>
-                <div style={{ background:"rgba(255,255,255,0.55)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:16, padding:22, position:"sticky", top:78, backdropFilter:"none" }}>
+              <div className="cal-compact">
+                <div style={{ background:"rgba(255,255,255,0.9)", backdropFilter:"blur(10px)", borderRadius:22, border:"1px solid rgba(255,255,255,0.7)", boxShadow:"0 18px 50px rgba(58,72,98,0.10)", position:"sticky", top:78 }}>
                   <CalendarView appData={appData} lang={lang} selectedDay={selectedDay} onSelectDay={handleSelectDay}/>
                 </div>
                 <div>
@@ -3302,38 +3276,58 @@ export default function App() {
 
         {/* STATS */}
         {tab === "stats" && (
-          <div style={{ display:"flex",flexDirection:"column",gap:18 }}>
-            <div style={{ background:"rgba(255,255,255,0.55)",border:"1px solid rgba(255,255,255,0.7)",borderRadius:16,padding:22,display:"flex",gap:28,justifyContent:"center",flexWrap:"wrap",backdropFilter:"none" }}>
-              <CircleProgress pct={todayPct} size={88} color={THEME.skyBlue} label={`${todayPct}%`} sublabel={L.dayProgress}/>
-              <CircleProgress pct={wAvg} size={88} color="#7F77DD" label={`${wAvg}%`} sublabel={L.weekProgress}/>
-              <CircleProgress pct={mAvg} size={88} color="#1D9E75" label={`${mAvg}%`} sublabel={L.monthProgress}/>
-              <CircleProgress pct={yAvg} size={88} color={THEME.sunsetApricot} label={`${yAvg}%`} sublabel={L.yearProgress}/>
-            </div>
-            {[[weekData,"#7F77DD",L.weekProgress],[monthData,"#1D9E75",L.monthProgress],[yearData,THEME.sunsetApricot,L.yearProgress]].map(([data,color,label])=>(
-              <div key={label} style={{ background:"rgba(255,255,255,0.55)",border:"1px solid rgba(255,255,255,0.7)",borderRadius:16,padding:22,backdropFilter:"none" }}>
-                <div style={{ fontSize:13,color:THEME.textLight,marginBottom:14 }}>{label}</div>
-                <BarChart data={data} color={color}/>
-              </div>
-            ))}
-            <div style={{ background:"rgba(255,255,255,0.55)",border:"1px solid rgba(255,255,255,0.7)",borderRadius:16,padding:22,backdropFilter:"none" }}>
-              <div style={{ fontSize:13,color:THEME.textLight,marginBottom:14 }}>{L.byBlock}</div>
-              <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
-                {todayBlocks.map(block=>{
-                  const col = BLOCK_COLORS.find(c=>c.id===block.colorId)||BLOCK_COLORS[0];
-                  const bp = calcPct([block]);
+          <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+            {/* Rings */}
+            <div className="st-card">
+              <div className="st-rings">
+                {[
+                  [todayPct, L.dayProgress],
+                  [wAvg, L.weekProgress],
+                  [mAvg, L.monthProgress],
+                  [yAvg, L.yearProgress],
+                ].map(([pct, label]) => {
+                  const r = 46, c = 2 * Math.PI * r;
+                  const off = c * (1 - pct / 100);
                   return (
-                    <div key={block.id}>
-                      <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                        <span style={{ fontSize:13,color:THEME.text }}>{block.names[lang]||block.names.ru}</span>
-                        <span style={{ fontSize:13,fontWeight:500,color:col.accent }}>{bp}%</span>
-                      </div>
-                      <div style={{ height:5,background:"rgba(255,255,255,0.4)",borderRadius:4,overflow:"hidden" }}>
-                        <div style={{ height:"100%",width:`${bp}%`,background:col.accent,borderRadius:4,transition:"width 0.5s ease" }}/>
-                      </div>
+                    <div key={label} className="st-ring">
+                      <svg className="st-ring-svg" viewBox="0 0 104 104">
+                        <circle className="st-ring-track" cx="52" cy="52" r={r}/>
+                        {pct > 0 && <circle className="st-ring-fill" cx="52" cy="52" r={r} strokeDasharray={c} strokeDashoffset={off}/>}
+                        <text className="st-ring-pct" x="52" y="52" dominantBaseline="central" textAnchor="middle">{pct}%</text>
+                      </svg>
+                      <span className="st-ring-label">{label}</span>
                     </div>
                   );
                 })}
               </div>
+            </div>
+            {/* Charts */}
+            {[[weekData, L.weekProgress, (lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])],
+              [monthData, L.monthProgress, (lang==="ru"?["Н1","Н2","Н3","Н4"]:["W1","W2","W3","W4"])],
+              [yearData, L.yearProgress, (lang==="ru"?["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"]:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"])],
+            ].map(([data, label, xlabels]) => (
+              <div key={label} className="st-card">
+                <p className="st-card-title">{label}</p>
+                <HabitAreaChart data={data.map((v,i) => ({ val: v, label: xlabels[i] }))} color="#5B9BE8"/>
+                <div className="st-chart-xlabels">{xlabels.map((l,i)=><span key={i}>{l}</span>)}</div>
+              </div>
+            ))}
+            {/* By block */}
+            <div className="st-card">
+              <p className="st-card-title">{L.byBlock}</p>
+              {todayBlocks.map(block => {
+                const col = BLOCK_COLORS.find(c=>c.id===block.colorId)||BLOCK_COLORS[0];
+                const bp = calcPct([block]);
+                return (
+                  <div key={block.id} className="st-brow">
+                    <span className="st-brow-name">
+                      <span className="st-brow-dot" style={{ background: col.accent }}/>
+                      {block.names[lang]||block.names.ru}
+                    </span>
+                    <span className={"st-brow-pct" + (bp===0?" zero":"")}>{bp}%</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
