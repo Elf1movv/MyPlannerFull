@@ -125,7 +125,6 @@ const BG_ANIM_STYLE = `
 `;
 // ── Login Screen CSS ────────────────────────────────────────────────
 const LOGIN_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
   .lg-stage { position:fixed; inset:0; overflow:hidden; font-family:'DM Sans','Manrope',system-ui,sans-serif; color:#2D4A6B; }
   .lg-bg { position:absolute; inset:0; z-index:0;
@@ -144,8 +143,8 @@ const LOGIN_CSS = `
   /* theme switch bottom-right */
   .lg-switch { position:absolute; z-index:6; bottom:24px; right:24px; display:flex;
     gap:3px; padding:4px; border-radius:30px;
-    background:rgba(255,255,255,.62); backdrop-filter:blur(8px);
-    box-shadow:0 4px 14px rgba(60,72,98,.10); }
+    background:rgba(255,255,255,0.62); backdrop-filter:blur(8px);
+    box-shadow:0 4px 14px rgba(60,72,98,0.10); }
   .lg-sw { width:34px; height:34px; border:0; border-radius:24px; background:transparent;
     color:#9AAAB8; display:flex; align-items:center; justify-content:center;
     padding:8px; transition:.16s; cursor:pointer; }
@@ -165,7 +164,7 @@ const LOGIN_CSS = `
 
   /* quote aside */
   .lg-q-mark { font-family:'Comfortaa',sans-serif; font-size:64px; font-weight:700;
-    line-height:0; height:30px; display:block; color:rgba(255,140,66,.55); }
+    line-height:0; height:30px; display:block; color:rgba(255,140,66,0.55); }
   .lg-q-text { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
     line-height:1.32; color:#2D4A6B; margin:18px 0 26px; max-width:560px;
     letter-spacing:-.01em; }
@@ -178,9 +177,9 @@ const LOGIN_CSS = `
   .lg-s-title { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
     color:#2D4A6B; margin:12px 0 28px; line-height:1.25; letter-spacing:-.01em; }
   .lg-s-tile { display:flex; align-items:center; gap:16px;
-    background:rgba(255,255,255,.5); backdrop-filter:blur(6px);
+    background:rgba(255,255,255,0.5); backdrop-filter:blur(6px);
     border-radius:18px; padding:18px 22px; max-width:420px;
-    box-shadow:0 6px 18px rgba(60,72,98,.07); }
+    box-shadow:0 6px 18px rgba(60,72,98,0.07); }
   .lg-s-tile b { font-size:17px; font-weight:700; color:#2D4A6B; display:block; }
   .lg-s-tile span { font-size:13px; color:#9AAAB8; font-weight:500; }
   .lg-s-note { font-size:13.5px; font-style:italic; color:#9AAAB8; margin-top:18px; }
@@ -195,10 +194,10 @@ const LOGIN_CSS = `
   /* card */
   .lg-card-zone { flex:0 0 auto; display:flex; justify-content:center; }
   .lg-card { width:300px; background:#fff; border-radius:24px; padding:36px 34px 32px;
-    box-shadow:0 26px 64px rgba(58,72,98,.17),0 5px 16px rgba(58,72,98,.07);
-    border:1px solid rgba(255,255,255,.85);
+    box-shadow:0 26px 64px rgba(58,72,98,0.17),0 5px 16px rgba(58,72,98,0.07);
+    border:1px solid rgba(255,255,255,0.85);
     display:flex; flex-direction:column; align-items:center; cursor:text; }
-  .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,.07,.19,.97); }
+  .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,0.07,0.19,0.97); }
   @keyframes lgShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-9px)}40%,60%{transform:translateX(9px)}}
   .lg-card-title { font-family:'Comfortaa',sans-serif; font-size:42px; font-weight:700;
     color:#2D4A6B; line-height:1; margin:0; letter-spacing:-.02em; }
@@ -209,11 +208,11 @@ const LOGIN_CSS = `
   .lg-pin-field { position:relative; width:200px; height:56px; border-radius:14px; background:#fff;
     border:2px solid #FBD7C4; display:flex; align-items:center; justify-content:center; gap:14px;
     cursor:text; transition:border-color .18s, box-shadow .18s; }
-  .lg-pin-field:focus-within { border-color:#FF8C42; box-shadow:0 0 0 4px rgba(255,140,66,.14); }
-  .lg-pin-field.err { border-color:#EE5B52; box-shadow:0 0 0 4px rgba(238,91,82,.13); }
+  .lg-pin-field:focus-within { border-color:#FF8C42; box-shadow:0 0 0 4px rgba(255,140,66,0.14); }
+  .lg-pin-field.err { border-color:#EE5B52; box-shadow:0 0 0 4px rgba(238,91,82,0.13); }
   .lg-pin-bullet { width:9px; height:9px; border-radius:50%; background:#2D4A6B; display:block; }
   .lg-pin-bullet.err { background:#EE5B52; }
-  .lg-pin-empty { width:9px; height:9px; border-radius:50%; background:rgba(45,74,107,.18); display:block; }
+  .lg-pin-empty { width:9px; height:9px; border-radius:50%; background:rgba(45,74,107,0.18); display:block; }
   .lg-pin-caret { width:2px; height:22px; background:#FF8C42; border-radius:2px; display:block;
     animation:lgBlink 1.1s steps(1) infinite; }
   @keyframes lgBlink{0%,50%{opacity:1}51%,100%{opacity:0}}
@@ -225,9 +224,9 @@ const LOGIN_CSS = `
   .lg-enter { margin-top:14px; width:200px; height:48px; border:0; border-radius:14px;
     color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
     background:linear-gradient(180deg,#FFA45C,#FF8C42);
-    box-shadow:0 10px 22px rgba(255,140,66,.38),inset 0 1px 0 rgba(255,255,255,.35);
+    box-shadow:0 10px 22px rgba(255,140,66,0.38),inset 0 1px 0 rgba(255,255,255,0.35);
     display:flex; align-items:center; justify-content:center; gap:8px; transition:.16s; }
-  .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,.46),inset 0 1px 0 rgba(255,255,255,.35); }
+  .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,0.46),inset 0 1px 0 rgba(255,255,255,0.35); }
   .lg-enter:active { transform:translateY(0); }
 
   /* success overlay */
@@ -775,7 +774,7 @@ function CircleProgress({ pct: p, size = 80, stroke = 6, color = "#1D9E75", labe
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={stroke} />
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1)" }} />
+          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,0.2,1)" }} />
       </svg>
       {label && <div style={{ textAlign: "center", marginTop: -4 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: THEME.text }}>{label}</div>
@@ -3085,7 +3084,7 @@ export default function App() {
 
   return (
     <div className="animated-bg" style={{ minHeight: "100vh", fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" /> rel="stylesheet" />
       <style>{BG_ANIM_STYLE}</style>
 
       {/* New day modal */}
