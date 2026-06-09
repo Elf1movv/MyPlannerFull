@@ -237,3 +237,94 @@
   display: inline-block; width: fit-content;
 }
 .v17-ev-name { font-size: 13.5px; font-weight: 600; color: #2D4A6B; }
+
+/* ── v17 Habits ── */
+.v17-habits {
+  background: #fff; border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 12px 34px rgba(74,54,32,0.07), 0 2px 6px rgba(74,54,32,0.04);
+  overflow: hidden;
+}
+.v17-habits-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid rgba(45,74,107,0.06);
+}
+.v17-habits-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: rgba(55,138,221,0.12);
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.v17-habits-title { font-size: 16px; font-weight: 700; color: #2D4A6B; flex: 1; }
+.v17-habits-grid-lbl { font-size: 12px; color: #9AAAB8; font-weight: 500; }
+
+.v17-habits-body { padding: 14px 22px; overflow-x: auto; }
+
+/* column headers */
+.v17-col-hdr {
+  font-size: 10px; color: #9AAAB8; font-weight: 600;
+  text-align: center; padding: 2px 0;
+}
+
+/* habit row */
+.v17-habit-row { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.v17-habit-label {
+  display: flex; align-items: center; gap: 6px;
+  width: 180px; flex-shrink: 0; padding-right: 8px;
+}
+.v17-habit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.v17-habit-name { font-size: 13px; color: #2D4A6B; font-weight: 500; flex: 1; min-width: 0; }
+.v17-habit-streak { font-size: 10px; font-weight: 600; white-space: nowrap; }
+.v17-habit-del {
+  border: none; background: transparent; color: #C8BFB0;
+  cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
+  opacity: 0; transition: opacity 0.15s;
+}
+.v17-habit-row:hover .v17-habit-del { opacity: 1; }
+
+/* habit cell */
+.v17-cell {
+  border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex: 1; aspect-ratio: 1;
+  border: 1px solid rgba(255,255,255,0.6);
+  min-width: 0;
+}
+.v17-cell.today { border-width: 2px; }
+.v17-cell.future { cursor: default; opacity: 0.4; }
+.v17-cell.done { }
+.v17-cell-check { color: #fff; font-weight: 700; }
+
+/* add habit */
+.v17-add-habit {
+  font-size: 13px; color: #FF8C42; background: transparent; border: none;
+  cursor: pointer; font-family: inherit; padding: 8px 0; font-weight: 600;
+  display: flex; align-items: center; gap: 5px;
+}
+.v17-add-habit:hover { opacity: 0.8; }
+
+/* chart section */
+.v17-chart-section {
+  padding: 16px 22px 20px;
+  border-top: 1px solid rgba(45,74,107,0.06);
+}
+.v17-chart-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.v17-chart-lbl { font-size: 12px; color: #9AAAB8; font-weight: 500; }
+.v17-chart-dot {
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  border: 2.5px solid transparent; box-sizing: border-box; transition: border 0.15s;
+}
+.v17-chart-dot.sel { border-color: #2D4A6B; }
+.v17-chart-completed { font-size: 11px; color: #9AAAB8; margin-top: 6px; }
+
+/* add habit form */
+.v17-habit-form {
+  padding: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.v17-habit-form input {
+  flex: 1; min-width: 120px; border: 1px solid #E8EEF4; border-radius: 10px;
+  padding: 7px 11px; font-size: 13px; font-family: inherit; outline: none;
+  background: #F7FAFC;
+}

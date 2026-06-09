@@ -940,43 +940,45 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
   const CHART_COLORS = ["#378ADD","#1D9E75","#FF8C42","#D4537E","#7F77DD","#D4A017","#E53935","#00ACC1","#9C27B0","#FF5722","#7CB342","#F9A825"];
 
   return (
-    <div style={{ background:"rgba(255,255,255,0.55)", borderRadius:20, border:"1px solid rgba(255,255,255,0.7)", backdropFilter:"none", overflow:"hidden" }}>
-      {/* Header */}
-      <div style={{ padding:"16px 20px 12px", borderBottom:"1px solid rgba(255,255,255,0.5)", display:"flex", alignItems:"center", gap:10 }}>
-        <span style={{ fontSize:18 }}>🔄</span>
-        <span style={{ fontSize:15, fontWeight:700, color:THEME.text, flex:1 }}>{L.habits}</span>
-        <span style={{ fontSize:12, color:THEME.textLight }}>{L.habitsGrid}</span>
+    <div className="v17-habits">
+      {/* Header v17 */}
+      <div className="v17-habits-head">
+        <div className="v17-habits-icon">🔄</div>
+        <span className="v17-habits-title">{L.habits}</span>
+        <span className="v17-habits-grid-lbl">{L.habitsGrid}</span>
       </div>
 
-      <div style={{ padding:"12px 20px", overflowX:"auto" }}>
+      <div className="v17-habits-body">
         {/* Column headers */}
-        <div style={{ display:"grid", gridTemplateColumns:`180px repeat(${days.length}, 1fr)`, gap:3, marginBottom:4, minWidth: period==="month" ? 860 : "auto" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"180px repeat(" + days.length + ", 1fr)", gap:3, marginBottom:6, minWidth: period==="month" ? 860 : "auto" }}>
           <div/>
           {dayLabels.map((l, i) => (
-            <div key={i} style={{ textAlign:"center", fontSize: period==="month"?9:10, color:THEME.textLight, fontWeight:500, padding:"2px 0" }}>{l}</div>
+            <div key={i} className="v17-col-hdr" style={{ fontSize: period==="month" ? 9 : 10 }}>{l}</div>
           ))}
         </div>
 
-        {/* Habit rows */}
+        {/* Habit rows v17 */}
         {habits.map(habit => {
           const streak = getStreak(habit.id);
           return (
-            <div key={habit.id} style={{ display:"grid", gridTemplateColumns:`180px repeat(${days.length}, 1fr)`, gap:3, marginBottom:5, minWidth: period==="month" ? 860 : "auto", alignItems:"center" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6, paddingRight:8 }}>
-                <div style={{ width:8, height:8, borderRadius:"50%", background:habit.color, flexShrink:0 }}/>
+            <div key={habit.id} className="v17-habit-row" style={{ display:"grid", gridTemplateColumns:"180px repeat(" + days.length + ", 1fr)", gap:3, minWidth: period==="month" ? 860 : "auto", alignItems:"center" }}>
+              <div className="v17-habit-label">
+                <div className="v17-habit-dot" style={{ background: habit.color }}/>
                 <EditableTitle value={habit.names[lang]||habit.names.ru}
                   onChange={n => onRenameHabit(habit.id, {...habit.names, [lang]:n})}
-                  style={{ fontSize:12, color:THEME.text, fontWeight:500, flex:1, minWidth:0, whiteSpace:"normal", wordBreak:"break-word" }}/>
-                {streak > 0 && <span style={{ fontSize:10, color:habit.color, fontWeight:600, whiteSpace:"nowrap" }}>🔥{streak}</span>}
-                <button onClick={() => onDeleteHabit(habit.id)} style={{ border:"none", background:"transparent", color:"#D3D1C7", cursor:"pointer", fontSize:13, padding:0, flexShrink:0 }}>×</button>
+                  style={{ fontSize:13, color:"#2D4A6B", fontWeight:500, flex:1, minWidth:0 }}/>
+                {streak > 0 && <span className="v17-habit-streak" style={{ color: habit.color }}>🔥{streak}</span>}
+                <button className="v17-habit-del" onClick={() => onDeleteHabit(habit.id)}>×</button>
               </div>
               {days.map((dayKey, ci) => {
                 if (period === "year") {
                   const { done, total } = getMonthPct(habit.id, dayKey);
                   const pct = total ? Math.round((done/total)*100) : 0;
                   return (
-                    <div key={ci} style={{ aspectRatio:"1", borderRadius:5, background: pct>0 ? habit.color+Math.round(pct*2.55).toString(16).padStart(2,"0") : "rgba(255,255,255,0.4)", border:"1px solid rgba(255,255,255,0.6)", display:"flex", alignItems:"center", justifyContent:"center" }} title={`${pct}%`}>
-                      <span style={{ fontSize:9, color: pct>60?"#fff":THEME.textLight }}>{pct>0?`${pct}%`:""}</span>
+                    <div key={ci} className="v17-cell"
+                      style={{ background: pct>0 ? habit.color+Math.round(pct*2.55).toString(16).padStart(2,"0") : "rgba(45,74,107,0.05)" }}
+                      title={pct + "%"}>
+                      <span style={{ fontSize:9, color: pct>60?"#fff":"#9AAAB8" }}>{pct>0 ? pct+"%" : ""}</span>
                     </div>
                   );
                 }
@@ -985,13 +987,12 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
                 return (
                   <div key={ci}
                     onClick={() => !isFuture && onToggle(dayKey, habit.id)}
+                    className={"v17-cell" + (isDone?" done":"") + (isFuture?" future":"") + (dayKey===TODAY?" today":"")}
                     style={{
-                      aspectRatio:"1", borderRadius:5, cursor: isFuture?"default":"pointer",
-                      background: isDone ? habit.color : "rgba(255,255,255,0.4)",
-                      border: dayKey===TODAY ? `2px solid ${habit.color}` : "1px solid rgba(255,255,255,0.6)",
-                      display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s",
+                      background: isDone ? habit.color : "rgba(45,74,107,0.05)",
+                      borderColor: dayKey===TODAY ? habit.color : "rgba(45,74,107,0.08)",
                     }}>
-                    {isDone && <span style={{ color:"#fff", fontSize: period==="month"?8:11, fontWeight:700 }}>✓</span>}
+                    {isDone && <span className="v17-cell-check" style={{ fontSize: period==="month" ? 8 : 11 }}>✓</span>}
                   </div>
                 );
               })}
@@ -999,50 +1000,49 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
           );
         })}
 
-        {/* Add habit */}
+        {/* Add habit v17 */}
         {addingHabit ? (
-          <div style={{ padding:"10px 0", display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <div className="v17-habit-form">
             <input autoFocus value={newHabitName} onChange={e=>setNewHabitName(e.target.value)}
               onKeyDown={e=>{ if(e.key==="Escape")setAddingHabit(false); }}
-              placeholder={L.newHabit}
-              style={{ flex:1, minWidth:120, border:"1px solid rgba(255,255,255,0.7)", borderRadius:8, padding:"6px 10px", fontSize:13, fontFamily:"inherit", outline:"none", background:"rgba(255,255,255,0.6)" }}/>
-            <div style={{ display:"flex", gap:5 }}>
+              placeholder={L.newHabit}/>
+            <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
               {HABIT_COLORS.map(c=>(
                 <div key={c} onClick={()=>setNewHabitColor(c)}
-                  style={{ width:20, height:20, borderRadius:"50%", background:c, cursor:"pointer", border:newHabitColor===c?"3px solid #1a1a18":"3px solid transparent", boxSizing:"border-box" }}/>
+                  style={{ width:20, height:20, borderRadius:"50%", background:c, cursor:"pointer", border:newHabitColor===c?"3px solid #2D4A6B":"3px solid transparent", boxSizing:"border-box" }}/>
               ))}
             </div>
             <button onClick={()=>{ if(!newHabitName.trim())return; onAddHabit({id:uid(),names:{ru:newHabitName,en:newHabitName},color:newHabitColor}); setNewHabitName(""); setAddingHabit(false); }}
-              style={{ padding:"5px 12px", borderRadius:8, border:"none", background:THEME.sunsetApricot, color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>{L.save}</button>
+              style={{ padding:"7px 14px", borderRadius:10, border:"none", background:"#FF8C42", color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>{L.save}</button>
             <button onClick={()=>setAddingHabit(false)}
-              style={{ padding:"5px 9px", borderRadius:8, border:"1px solid rgba(255,255,255,0.6)", background:"rgba(255,255,255,0.4)", color:THEME.textLight, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>{L.cancel}</button>
+              style={{ padding:"7px 11px", borderRadius:10, border:"1px solid #E8EEF4", background:"#fff", color:"#9AAAB8", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>{L.cancel}</button>
           </div>
         ) : (
-          <button onClick={()=>setAddingHabit(true)}
-            style={{ fontSize:12, color:THEME.textLight, background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", padding:"8px 0" }}>
-            + {L.addHabit}
+          <button className="v17-add-habit" onClick={()=>setAddingHabit(true)}>
+            {L.addHabit}
           </button>
         )}
       </div>
 
-      {/* Combined progress chart — under all habits */}
+      {/* Chart section v17 */}
       {habits.length > 0 && (
-        <div style={{ padding:"0 20px 20px", borderTop:"1px solid rgba(255,255,255,0.4)", paddingTop:16 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8, flexWrap:"wrap" }}>
-            <span style={{ fontSize:12, color:THEME.textLight, fontWeight:500 }}>
+        <div className="v17-chart-section">
+          <div className="v17-chart-head">
+            <span className="v17-chart-lbl">
               {lang==="ru" ? "Общий прогресс привычек" : "Total habit progress"}
             </span>
             <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
               {CHART_COLORS.map(c => (
                 <div key={c} onClick={() => setChartColor(c)}
-                  style={{ width:16, height:16, borderRadius:"50%", background:c, cursor:"pointer", border: chartColor===c ? "2.5px solid #1a1a18" : "2px solid transparent", boxSizing:"border-box", transition:"border 0.15s" }}/>
+                  className={"v17-chart-dot" + (chartColor===c?" sel":"")}
+                  style={{ background:c }}/>
               ))}
             </div>
           </div>
           <HabitAreaChart data={combinedData} color={chartColor}/>
           {totalPossible > 0 && (
-            <div style={{ fontSize:11, color:THEME.textLight, marginTop:4 }}>
-              {lang==="ru"?"Выполнено":"Completed"}: {totalDone}/{totalPossible} ({Math.round(totalDone/totalPossible*100)}%)
+            <div className="v17-chart-completed">
+              {lang==="ru"?"Выполнено":"Completed"}: {totalDone} из {totalPossible} ({Math.round(totalDone/totalPossible*100)}%)
             </div>
           )}
         </div>
