@@ -1,69 +1,48 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { createClient } from "@supabase/supabase-js";
 
-// ── Supabase Sync ───────────────────────────────────────────────────
+// ── Supabase Client ─────────────────────────────────────────────────
 const SUPABASE_URL = "https://mahvuymxoddkiquhcngx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_MbWRZ_V-R8BSEa_4GECblg_g7jdegC8";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function sbFetch(method, body) {
-  const opts = {
-    method,
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": "Bearer " + SUPABASE_KEY,
-      "Content-Type": "application/json",
-      "Prefer": method === "POST" ? "resolution=merge-duplicates" : "",
-    },
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const url = SUPABASE_URL + "/rest/v1/planner_data?id=eq.main";
-  const r = await fetch(url, opts);
-  if (method === "GET") return r.json();
-  return r.ok;
+// ── Auth-aware cloud sync (uses user_data table) ───────────────────
+async function loadFromCloud(userId) {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from("user_data")
+      .select("data, updated_at")
+      .eq("user_id", userId)
+      .single();
+    if (error || !data) return null;
+    return { ...data.data, _cloudUpdatedAt: data.updated_at };
+  } catch(e) { console.warn("Cloud load failed:", e); return null; }
 }
 
-// Save only if our data is newer than what's in the cloud
-async function saveToCloudSafe(data) {
+async function saveToCloud(userId, data) {
+  if (!userId) return;
   try {
-    // Check cloud timestamp first
-    const rows = await sbFetch("GET");
-    if (rows && rows.length > 0) {
-      const cloudUpdated = new Date(rows[0].updated_at);
-      const localSaved = window.__lastLocalSave__ || new Date(0);
-      // Only save if we have changes newer than cloud
-      if (cloudUpdated > localSaved && !window.__hasLocalChanges__) {
-        return; // Cloud is newer, don't overwrite
-      }
-    }
-    await saveToCloud(data);
-    window.__hasLocalChanges__ = false;
-    window.__lastLocalSave__ = new Date();
-  } catch(e) { console.warn("saveToCloudSafe failed:", e); }
-}
-
-async function loadFromCloud() {
-  try {
-    const rows = await sbFetch("GET");
-    if (rows && rows.length > 0) {
-      const d = rows[0].data;
-      if (d && Object.keys(d).length > 0) return d;
-    }
-  } catch(e) { console.warn("[SYNC] Cloud load failed:", e); }
-  return null;
-}
-
-async function saveToCloud(data) {
-  try {
-    await sbFetch("POST", [{ id: "main", data, updated_at: new Date().toISOString() }]);
+    const payload = { ...data };
+    delete payload._cloudUpdatedAt;
+    const { error } = await supabase
+      .from("user_data")
+      .upsert({ user_id: userId, data: payload, updated_at: new Date().toISOString() });
+    if (error) console.warn("Cloud save error:", error);
   } catch(e) { console.warn("Cloud save failed:", e); }
 }
 
-async function getCloudTimestamp() {
+async function getCloudTimestamp(userId) {
+  if (!userId) return null;
   try {
-    const rows = await sbFetch("GET");
-    if (rows && rows.length > 0) return rows[0].updated_at;
-  } catch(e) {}
-  return null;
+    const { data } = await supabase
+      .from("user_data")
+      .select("updated_at")
+      .eq("user_id", userId)
+      .single();
+    return data?.updated_at || null;
+  } catch(e) { return null; }
 }
 
 
@@ -464,123 +443,89 @@ function LgAsideStats() {
 }
 
 // ── Password Screen ──────────────────────────────────────────────────
-function PasswordScreen({ onUnlock }) {
-  const [pin, setPin]         = useState('');
-  const [error, setError]     = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [shake, setShake]     = useState(false);
-  const [theme, setTheme]     = useState(() => localStorage.getItem("login_theme") || "quote");
-  const timers = useRef([]);
+// ── Auth Screen (Email) ─────────────────────────────────────────────
+const AUTH_CSS = `
+  .auth-stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(125deg,#DBEAFB 0%,#E6F5ED 30%,#FCF7E2 60%,#FDEAE0 100%);
+    font-family:'DM Sans',system-ui,sans-serif; }
+  .auth-card { background:#fff; border-radius:24px; padding:40px 36px; width:100%; max-width:380px;
+    box-shadow:0 26px 64px rgba(58,72,98,0.16); }
+  .auth-logo { width:52px; height:52px; background:#FF8C42; border-radius:16px; display:flex;
+    align-items:center; justify-content:center; margin:0 auto 20px; color:#fff; font-size:24px; }
+  .auth-title { font-size:26px; font-weight:700; color:#2D4A6B; text-align:center; margin:0 0 6px; }
+  .auth-sub { font-size:13.5px; color:#9AAAB8; text-align:center; margin:0 0 28px; }
+  .auth-tabs { display:flex; gap:3px; background:rgba(45,74,107,0.07); border-radius:30px;
+    padding:3px; margin-bottom:24px; }
+  .auth-tab { flex:1; padding:8px; border:0; border-radius:24px; background:transparent;
+    font-size:13.5px; font-weight:600; color:#9AAAB8; cursor:pointer; font-family:inherit; transition:0.15s; }
+  .auth-tab.on { background:#fff; color:#2D4A6B; box-shadow:0 2px 8px rgba(45,74,107,0.12); }
+  .auth-field { width:100%; box-sizing:border-box; border:1.5px solid #E8EEF4; border-radius:12px;
+    padding:12px 14px; font-size:14px; font-family:inherit; outline:none; margin-bottom:12px;
+    transition:border-color 0.15s; color:#2D4A6B; }
+  .auth-field:focus { border-color:#FF8C42; }
+  .auth-btn { width:100%; padding:13px; border:0; border-radius:12px;
+    background:linear-gradient(135deg,#FFB07C,#FF8C42); color:#fff; font-size:15px;
+    font-weight:700; cursor:pointer; font-family:inherit; margin-top:4px;
+    box-shadow:0 8px 20px rgba(255,140,66,0.35); transition:0.15s; }
+  .auth-btn:hover { transform:translateY(-1px); box-shadow:0 12px 26px rgba(255,140,66,0.42); }
+  .auth-btn:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+  .auth-err { font-size:12.5px; color:#EE5B52; text-align:center; margin-top:8px; font-weight:500; }
+  .auth-ok { font-size:12.5px; color:#4FB07A; text-align:center; margin-top:8px; font-weight:500; }
+  .auth-divider { text-align:center; color:#9AAAB8; font-size:12px; margin:16px 0; }
+`;
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const after = (ms, fn) => { const t = setTimeout(fn, ms); timers.current.push(t); };
+function AuthScreen({ onAuth }) {
+  const [mode, setMode]       = useState("login"); // "login" | "register"
+  const [email, setEmail]     = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [message, setMessage] = useState("");
 
-  const handleSubmit = useCallback(() => {
-    if (success) return;
-    if (pin === CORRECT_PASSWORD) {
-      setSuccess(true);
-      after(1400, () => { localStorage.setItem("planner_auth","1"); onUnlock(); });
-    } else {
-      setShake(true); setError(true); setPin('');
-      after(420, () => setShake(false));
-      after(1500, () => setError(false));
-    }
-  }, [pin, success, onUnlock]);
-
-  const handleKey = useCallback((k) => {
-    if (success) return;
-    if (k === 'back') { setError(false); setPin(p => p.slice(0,-1)); return; }
-    setError(false);
-    setPin(prev => {
-      if (prev.length >= 4) return prev;
-      const next = prev + k;
-      if (next.length === 4) {
-        after(120, () => {
-          if (next === CORRECT_PASSWORD) {
-            setSuccess(true);
-            after(1400, () => { localStorage.setItem("planner_auth","1"); onUnlock(); });
-          } else {
-            setShake(true); setError(true);
-            after(420, () => { setPin(''); setShake(false); });
-            after(1500, () => setError(false));
-          }
-        });
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) { setError("Заполните все поля"); return; }
+    setLoading(true); setError(""); setMessage("");
+    try {
+      if (mode === "login") {
+        const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
+        if (e) { setError(e.message === "Invalid login credentials" ? "Неверный email или пароль" : e.message); }
+        else { onAuth(data.user); }
+      } else {
+        const { error: e } = await supabase.auth.signUp({ email, password });
+        if (e) { setError(e.message); }
+        else { setMessage("Письмо с подтверждением отправлено на " + email); }
       }
-      return next;
-    });
-  }, [success, onUnlock]);
-
-  // Physical keyboard
-  useEffect(() => {
-    const h = (e) => {
-      if (e.key === 'Enter') handleSubmit();
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [handleSubmit]);
-
-  const stageCls = 'lg-stage'
-    + (error ? ' is-error' : '')
-    + (shake ? ' is-shake' : '')
-    + (success ? ' is-success' : '');
-
-  const THEMES = [
-    { id:'quote', icon: LG_ICON.quote },
-    { id:'anim',  icon: LG_ICON.spark },
-    { id:'stats', icon: LG_ICON.stats },
-  ];
-
-  const isCenter = theme === 'anim';
+    } catch(e) { setError("Ошибка соединения"); }
+    setLoading(false);
+  };
 
   return (
-    <div className={stageCls}>
-      <style>{LOGIN_CSS}</style>
-      <div className="lg-bg"/>
-      <div className="lg-blob b1"/>
-      <div className="lg-blob b2"/>
-      <div className="lg-blob b3"/>
-      <div className="lg-brand">Мой планер</div>
-
-      {/* Main row */}
-      <div className={'lg-row ' + (isCenter ? 'center' : 'split')}>
-        {!isCenter && (
-          <div className="lg-aside-wrap">
-            {theme === 'quote' && <LgAsideQuote/>}
-            {theme === 'stats' && <LgAsideStats/>}
-          </div>
-        )}
-        {isCenter && <LgAsideAnim/>}
-        <div style={{ flexShrink:0, paddingRight: isCenter ? 0 : 'max(5vw,60px)' }}>
-          <LgCard pin={pin} error={error} onKey={handleKey} onSubmit={handleSubmit}/>
+    <div className="auth-stage">
+      <style>{AUTH_CSS}</style>
+      <div className="auth-card">
+        <div className="auth-logo">📅</div>
+        <h1 className="auth-title">Мой день</h1>
+        <p className="auth-sub">Твоя личная система жизни</p>
+        <div className="auth-tabs">
+          <button className={"auth-tab" + (mode==="login"?" on":"")} onClick={()=>{ setMode("login"); setError(""); setMessage(""); }}>Войти</button>
+          <button className={"auth-tab" + (mode==="register"?" on":"")} onClick={()=>{ setMode("register"); setError(""); setMessage(""); }}>Регистрация</button>
         </div>
+        <input className="auth-field" type="email" placeholder="Email" value={email}
+          onChange={e=>setEmail(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+        <input className="auth-field" type="password" placeholder="Пароль (минимум 6 символов)" value={password}
+          onChange={e=>setPassword(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+        <button className="auth-btn" onClick={handleSubmit} disabled={loading}>
+          {loading ? "Загрузка..." : mode==="login" ? "Войти" : "Создать аккаунт"}
+        </button>
+        {error && <div className="auth-err">{error}</div>}
+        {message && <div className="auth-ok">{message}</div>}
       </div>
-
-      {/* Success overlay */}
-      <div className="lg-success">
-        <svg className="lg-sun" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="4.4" fill="#FF8C42"/>
-          <g stroke="#FF8C42" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7L17 17M7 7L5.3 5.3"/>
-          </g>
-        </svg>
-        <h2>С возвращением!</h2>
-        <p>Хорошего и продуктивного дня ✨</p>
-      </div>
-
-      {/* Theme switch */}
-      <div className="lg-switch">
-        {THEMES.map(t => (
-          <button key={t.id} className={'lg-sw' + (theme===t.id ? ' on' : '')}
-            onClick={() => { setTheme(t.id); localStorage.setItem("login_theme", t.id); }}>
-            {t.icon({ width:18, height:18 })}
-          </button>
-        ))}
-      </div>
-
-
     </div>
   );
 }
+
 
 // ── Language ────────────────────────────────────────────────────────
 const LANG = {
@@ -703,7 +648,7 @@ async function flushOfflineQueue() {
   if (!q.length) return;
   try {
     const last = q[q.length - 1];
-    await saveToCloud(last.data);
+    await saveToCloud(window.__currentUserId__, last.data);
     setOfflineQueue([]);
   } catch {}
 }
@@ -2732,7 +2677,22 @@ function PomodoroTimer({ lang }) {
 // ── Main App ────────────────────────────────────────────────────────
 // Мой Планер v16.1
 export default function App() {
-  const [authed, setAuthed] = useState(() => localStorage.getItem("planner_auth") === "1");
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Check auth session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      window.__currentUserId__ = session?.user?.id ?? null;
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      window.__currentUserId__ = session?.user?.id ?? null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   const [lang, setLang] = useState("ru");
   const [appData, setAppData] = useState(loadAppData);
   const [tab, setTab] = useState("today");
@@ -2768,7 +2728,7 @@ export default function App() {
       // Re-save latest data now that we're back online
       if (latestData.current && !isFirstLoad.current) {
         const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
-        await saveToCloud(toSave);
+        await saveToCloud(user?.id, toSave);
         setLastSync(new Date());
       }
     };
@@ -2790,7 +2750,7 @@ export default function App() {
         const body = JSON.stringify([{ id: "main", data: toSave, updated_at: new Date().toISOString() }]);
         navigator.sendBeacon
           ? navigator.sendBeacon(SUPABASE_URL + "/rest/v1/planner_data?id=eq.main", new Blob([body], { type: "application/json" }))
-          : saveToCloud(toSave).catch(() => {});
+          : saveToCloud(user?.id, toSave).catch(() => {});
       }
     };
     window.addEventListener("beforeunload", handleUnload);
@@ -2808,7 +2768,7 @@ export default function App() {
       const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
       if (navigator.onLine) {
         setSyncing(true);
-        await saveToCloud(toSave);
+        await saveToCloud(user?.id, toSave);
         window.__hasLocalChanges__ = false;
         window.__lastLocalSave__ = new Date();
         setSyncing(false);
@@ -2826,7 +2786,7 @@ export default function App() {
     (async () => {
       setSyncing(true);
       if (navigator.onLine) await flushOfflineQueue();
-      const cloudData = navigator.onLine ? await loadFromCloud() : null;
+      const cloudData = navigator.onLine ? await loadFromCloud(user?.id) : null;
       const today = getLocalToday();
 
       // Compute new state based on cloud + local, then set directly
@@ -2884,13 +2844,17 @@ export default function App() {
       // Don't poll if we just saved (avoid overwriting our own save)
       if (window.__hasLocalChanges__) return;
       try {
-        const rows = await sbFetch("GET");
-        if (!rows?.length) return;
-        const cloudUpdated = new Date(rows[0]?.updated_at);
+        if (!user?.id) return;
+        const { data: rows, error } = await supabase
+          .from("user_data")
+          .select("data, updated_at")
+          .eq("user_id", user.id)
+          .single();
+        if (error || !rows) return;
+        const cloudUpdated = new Date(rows.updated_at);
         const localSaved = localSaveTime.current || new Date(0);
-        // Only pull if cloud is strictly newer than our last save
         if (cloudUpdated <= localSaved) return;
-        const cloudData = rows[0].data;
+        const cloudData = rows.data;
         if (!cloudData) return;
         const today = getLocalToday();
         setAppData(d => {
@@ -3139,7 +3103,13 @@ export default function App() {
     setAppData(d => ({ ...d, events: (d.events || []).map(e => e.id === id ? { ...e, ...patch } : e) }));
   }, []);
 
-  if (!authed) return <PasswordScreen onUnlock={() => setAuthed(true)} />;
+  if (authLoading) return (
+    <div style={{ position:"fixed", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
+      background:"linear-gradient(125deg,#DBEAFB 0%,#E6F5ED 30%,#FCF7E2 60%,#FDEAE0 100%)" }}>
+      <div style={{ fontSize:32 }}>⌛</div>
+    </div>
+  );
+  if (!user) return <AuthScreen onAuth={setUser} />;
 
   return (
     <div className="animated-bg" style={{ minHeight: "100vh", fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
@@ -3181,6 +3151,13 @@ export default function App() {
           </div>
           <QuickLinks lang={lang}/>
           <button className="v17-hbtn" onClick={exportData}>↑ {L.export}</button>
+          <button className="v17-hbtn" onClick={async () => {
+            await supabase.auth.signOut();
+            localStorage.removeItem("dailyplanner_v3");
+            localStorage.removeItem("planner_auth");
+          }} title="Выйти" style={{ color:"#EE5B52", borderColor:"rgba(238,91,82,0.3)" }}>
+            ⎋ {lang==="ru" ? "Выйти" : "Sign out"}
+          </button>
           <label className="v17-hbtn" style={{ cursor:"pointer" }}>
             ↓ {L.import}<input type="file" accept=".json" onChange={importData} style={{ display:"none" }}/>
           </label>
