@@ -22,16 +22,32 @@ async function sbFetch(method, body) {
   return r.ok;
 }
 
+// Save only if our data is newer than what's in the cloud
+async function saveToCloudSafe(data) {
+  try {
+    // Check cloud timestamp first
+    const rows = await sbFetch("GET");
+    if (rows && rows.length > 0) {
+      const cloudUpdated = new Date(rows[0].updated_at);
+      const localSaved = window.__lastLocalSave__ || new Date(0);
+      // Only save if we have changes newer than cloud
+      if (cloudUpdated > localSaved && !window.__hasLocalChanges__) {
+        return; // Cloud is newer, don't overwrite
+      }
+    }
+    await saveToCloud(data);
+    window.__hasLocalChanges__ = false;
+    window.__lastLocalSave__ = new Date();
+  } catch(e) { console.warn("saveToCloudSafe failed:", e); }
+}
+
 async function loadFromCloud() {
   try {
     const rows = await sbFetch("GET");
-    console.log("[SYNC] Cloud response:", JSON.stringify(rows)?.slice(0, 200));
     if (rows && rows.length > 0) {
       const d = rows[0].data;
-      console.log("[SYNC] Cloud lastDate:", d?.lastDate, "days:", Object.keys(d?.days || {}));
       if (d && Object.keys(d).length > 0) return d;
     }
-    console.log("[SYNC] No cloud data found");
   } catch(e) { console.warn("[SYNC] Cloud load failed:", e); }
   return null;
 }
@@ -2454,8 +2470,6 @@ function applyNewDay(data, today) {
   const todayHasRoutines = todayBlocks.some(b => b.tasks?.some(t => t.routine));
   const todayHasRealTasks = todayBlocks.some(b => b.tasks?.some(t => !t.routine));
 
-  console.log("[applyNewDay] td:", td, "last:", last, "todayData exists:", !!todayData, "hasReal:", todayHasRealTasks, "hasRoutines:", todayHasRoutines);
-
   if (!last || last === td) {
     if (!todayData) {
       return { ...data, days: { ...data.days, [td]: { blocks: DEFAULT_BLOCKS() } }, lastDate: td };
@@ -2783,17 +2797,20 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
-  // Save to localStorage immediately; debounce cloud save 2s
+  // Save to localStorage immediately; debounce cloud save 1s
   useEffect(() => {
     localStorage.setItem("dailyplanner_v3", JSON.stringify(appData));
     if (isFirstLoad.current) return;
     localSaveTime.current = new Date();
+    window.__hasLocalChanges__ = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
       if (navigator.onLine) {
         setSyncing(true);
         await saveToCloud(toSave);
+        window.__hasLocalChanges__ = false;
+        window.__lastLocalSave__ = new Date();
         setSyncing(false);
         setLastSync(new Date());
         setOfflinePending(false);
@@ -2815,18 +2832,13 @@ export default function App() {
       // Compute new state based on cloud + local, then set directly
       setAppData(local => {
         if (!cloudData || !cloudData.lastDate) {
-          console.log("[SYNC] No cloud data, using local");
           return applyNewDay(local, today);
         }
 
-        console.log("[SYNC] Got cloud data, lastDate:", cloudData.lastDate);
-
         const localIsEmpty = !window.__hadSavedData__;
-        console.log("[SYNC] hadSavedData:", window.__hadSavedData__, "localIsEmpty:", localIsEmpty);
 
         if (localIsEmpty) {
           const result = applyNewDay(cloudData, today);
-          console.log("[SYNC] Using cloud (fresh install), result days:", Object.keys(result.days || {}));
           return result;
         }
 
@@ -2853,7 +2865,6 @@ export default function App() {
         };
 
         const result = applyNewDay(base, today);
-        console.log("[SYNC] Smart merge result days:", Object.keys(result.days || {}), "today tasks:", result.days[today]?.blocks?.flatMap(b=>b.tasks||[]).map(t=>t.names?.ru));
         return result;
       });
 
@@ -2861,45 +2872,48 @@ export default function App() {
       setLastSync(new Date());
       setTimeout(() => {
         isFirstLoad.current = false;
-        // Force immediate save after load to ensure cloud is up to date
-        if (navigator.onLine && latestData.current) {
-          saveToCloud(latestData.current).catch(() => {});
-        }
+        // DO NOT force-save here — would overwrite cloud with stale local data
       }, 1500);
     })();
   }, []);
 
-  // Poll every 90s — single GET includes updated_at, no double fetch
+  // Poll every 30s — pull changes from other devices
   useEffect(() => {
     const id = setInterval(async () => {
       if (isFirstLoad.current || !navigator.onLine || document.hidden) return;
+      // Don't poll if we just saved (avoid overwriting our own save)
+      if (window.__hasLocalChanges__) return;
       try {
         const rows = await sbFetch("GET");
         if (!rows?.length) return;
-        const cloudUpdated = rows[0]?.updated_at;
-        const localSaved = localSaveTime.current;
-        if (!cloudUpdated || !localSaved) return;
-        const cloudTime = new Date(cloudUpdated);
-        // Only pull if cloud is newer AND we haven't saved in last 10s
-        if (cloudTime > localSaved && (Date.now() - localSaved.getTime()) > 10000) {
-          const cloudData = rows[0].data;
-          if (!cloudData) return;
-          const today = getLocalToday();
-          setAppData(d => {
-            const localToday = d.days[today];
-            const localHasWork = localToday?.blocks?.some(b => b.tasks?.some(t=>!t.routine));
-            const merged = applyNewDay({
-              ...cloudData,
-              goals: { ...(cloudData.goals||{}), ...(d.goals||{}) },
-              events: dedupeById([...(cloudData.events||[]), ...(d.events||[])]),
-              habitLog: { ...(cloudData.habitLog||{}), ...(d.habitLog||{}) },
-            }, today);
-            return localHasWork
-              ? { ...merged, days: { ...merged.days, [today]: localToday } }
-              : merged;
-          });
-          setLastSync(new Date());
-        }
+        const cloudUpdated = new Date(rows[0]?.updated_at);
+        const localSaved = localSaveTime.current || new Date(0);
+        // Only pull if cloud is strictly newer than our last save
+        if (cloudUpdated <= localSaved) return;
+        const cloudData = rows[0].data;
+        if (!cloudData) return;
+        const today = getLocalToday();
+        setAppData(d => {
+          // Merge cloud into local — cloud wins for history, local wins for today if has work
+          const localToday = d.days[today];
+          const cloudToday = cloudData.days?.[today];
+          const localRealTasks = localToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
+          const cloudRealTasks = cloudToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
+          const merged = {
+            ...cloudData,
+            version: Math.max(d.version||0, cloudData.version||0, DATA_VERSION),
+            goals: { ...(cloudData.goals||{}), ...(d.goals||{}) },
+            events: dedupeById([...(cloudData.events||[]), ...(d.events||[])]),
+            habitLog: { ...(cloudData.habitLog||{}), ...(d.habitLog||{}) },
+            days: {
+              ...cloudData.days,
+              [today]: localRealTasks >= cloudRealTasks ? localToday : cloudToday
+            }
+          };
+          return merged;
+        });
+        localSaveTime.current = cloudUpdated; // update to match cloud
+        setLastSync(new Date());
       } catch {}
     }, 30000);
     return () => clearInterval(id);
