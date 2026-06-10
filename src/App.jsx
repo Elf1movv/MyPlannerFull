@@ -2795,37 +2795,33 @@ export default function App() {
           return applyNewDay(local, today);
         }
 
-        const localIsEmpty = !window.__hadSavedData__;
-
-        if (localIsEmpty) {
-          const result = applyNewDay(cloudData, today);
-          return result;
-        }
-
-        const localV = local.version || 0;
-        const cloudV = cloudData.version || 0;
+        // With auth — cloud is always source of truth on load.
+        // Only keep local today's tasks if they are strictly newer
+        // (user made changes after last cloud save on this device)
         const localTodayBlocks = local.days[today]?.blocks || [];
         const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
         const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
         const localCount = countReal(localTodayBlocks);
         const cloudCount = countReal(cloudTodayBlocks);
 
+        // Cloud wins for everything except today if local has more real work
+        const localHasMoreWork = localCount > cloudCount && window.__hadSavedData__;
+
         const base = {
-          ...( cloudV >= localV ? cloudData : local ),
-          version: Math.max(localV, cloudV, DATA_VERSION),
+          ...cloudData,
+          version: Math.max(local.version||0, cloudData.version||0, DATA_VERSION),
           goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
           events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
           habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
           days: {
-            ...(cloudV >= localV ? cloudData.days : local.days),
-            [today]: localCount >= cloudCount
-              ? (local.days[today] || cloudData.days?.[today])
+            ...cloudData.days,
+            [today]: localHasMoreWork
+              ? local.days[today]
               : (cloudData.days?.[today] || local.days[today])
           }
         };
 
-        const result = applyNewDay(base, today);
-        return result;
+        return applyNewDay(base, today);
       });
 
       setSyncing(false);
