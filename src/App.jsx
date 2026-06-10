@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // ── Supabase Sync ───────────────────────────────────────────────────
 const SUPABASE_URL = "https://mahvuymxoddkiquhcngx.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1haHZ1eW14b2Rka2lxdWhjbmd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNzMwMzksImV4cCI6MjA5NDc0OTAzOX0.ZTAVqbUI5ihqbSWnIx8f9TWo6aN8uZHLXBYnr_kwK8Q";
+const SUPABASE_KEY = "sb_publishable_MbWRZ_V-R8BSEa_4GECblg_g7jdegC8";
 
 async function sbFetch(method, body) {
   const opts = {
@@ -22,6 +22,25 @@ async function sbFetch(method, body) {
   return r.ok;
 }
 
+// Save only if our data is newer than what's in the cloud
+async function saveToCloudSafe(data) {
+  try {
+    // Check cloud timestamp first
+    const rows = await sbFetch("GET");
+    if (rows && rows.length > 0) {
+      const cloudUpdated = new Date(rows[0].updated_at);
+      const localSaved = window.__lastLocalSave__ || new Date(0);
+      // Only save if we have changes newer than cloud
+      if (cloudUpdated > localSaved && !window.__hasLocalChanges__) {
+        return; // Cloud is newer, don't overwrite
+      }
+    }
+    await saveToCloud(data);
+    window.__hasLocalChanges__ = false;
+    window.__lastLocalSave__ = new Date();
+  } catch(e) { console.warn("saveToCloudSafe failed:", e); }
+}
+
 async function loadFromCloud() {
   try {
     const rows = await sbFetch("GET");
@@ -29,7 +48,7 @@ async function loadFromCloud() {
       const d = rows[0].data;
       if (d && Object.keys(d).length > 0) return d;
     }
-  } catch(e) { console.warn("Cloud load failed:", e); }
+  } catch(e) { console.warn("[SYNC] Cloud load failed:", e); }
   return null;
 }
 
@@ -125,7 +144,6 @@ const BG_ANIM_STYLE = `
 `;
 // ── Login Screen CSS ────────────────────────────────────────────────
 const LOGIN_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
   .lg-stage { position:fixed; inset:0; overflow:hidden; font-family:'DM Sans','Manrope',system-ui,sans-serif; color:#2D4A6B; }
   .lg-bg { position:absolute; inset:0; z-index:0;
@@ -144,8 +162,8 @@ const LOGIN_CSS = `
   /* theme switch bottom-right */
   .lg-switch { position:absolute; z-index:6; bottom:24px; right:24px; display:flex;
     gap:3px; padding:4px; border-radius:30px;
-    background:rgba(255,255,255,.62); backdrop-filter:blur(8px);
-    box-shadow:0 4px 14px rgba(60,72,98,.10); }
+    background:rgba(255,255,255,0.62); backdrop-filter:blur(8px);
+    box-shadow:0 4px 14px rgba(60,72,98,0.10); }
   .lg-sw { width:34px; height:34px; border:0; border-radius:24px; background:transparent;
     color:#9AAAB8; display:flex; align-items:center; justify-content:center;
     padding:8px; transition:.16s; cursor:pointer; }
@@ -165,7 +183,7 @@ const LOGIN_CSS = `
 
   /* quote aside */
   .lg-q-mark { font-family:'Comfortaa',sans-serif; font-size:64px; font-weight:700;
-    line-height:0; height:30px; display:block; color:rgba(255,140,66,.55); }
+    line-height:0; height:30px; display:block; color:rgba(255,140,66,0.55); }
   .lg-q-text { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
     line-height:1.32; color:#2D4A6B; margin:18px 0 26px; max-width:560px;
     letter-spacing:-.01em; }
@@ -178,9 +196,9 @@ const LOGIN_CSS = `
   .lg-s-title { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
     color:#2D4A6B; margin:12px 0 28px; line-height:1.25; letter-spacing:-.01em; }
   .lg-s-tile { display:flex; align-items:center; gap:16px;
-    background:rgba(255,255,255,.5); backdrop-filter:blur(6px);
+    background:rgba(255,255,255,0.5); backdrop-filter:blur(6px);
     border-radius:18px; padding:18px 22px; max-width:420px;
-    box-shadow:0 6px 18px rgba(60,72,98,.07); }
+    box-shadow:0 6px 18px rgba(60,72,98,0.07); }
   .lg-s-tile b { font-size:17px; font-weight:700; color:#2D4A6B; display:block; }
   .lg-s-tile span { font-size:13px; color:#9AAAB8; font-weight:500; }
   .lg-s-note { font-size:13.5px; font-style:italic; color:#9AAAB8; margin-top:18px; }
@@ -195,10 +213,10 @@ const LOGIN_CSS = `
   /* card */
   .lg-card-zone { flex:0 0 auto; display:flex; justify-content:center; }
   .lg-card { width:300px; background:#fff; border-radius:24px; padding:36px 34px 32px;
-    box-shadow:0 26px 64px rgba(58,72,98,.17),0 5px 16px rgba(58,72,98,.07);
-    border:1px solid rgba(255,255,255,.85);
+    box-shadow:0 26px 64px rgba(58,72,98,0.17),0 5px 16px rgba(58,72,98,0.07);
+    border:1px solid rgba(255,255,255,0.85);
     display:flex; flex-direction:column; align-items:center; cursor:text; }
-  .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,.07,.19,.97); }
+  .lg-stage.is-shake .lg-card { animation:lgShake .42s cubic-bezier(.36,0.07,0.19,0.97); }
   @keyframes lgShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-9px)}40%,60%{transform:translateX(9px)}}
   .lg-card-title { font-family:'Comfortaa',sans-serif; font-size:42px; font-weight:700;
     color:#2D4A6B; line-height:1; margin:0; letter-spacing:-.02em; }
@@ -209,11 +227,11 @@ const LOGIN_CSS = `
   .lg-pin-field { position:relative; width:200px; height:56px; border-radius:14px; background:#fff;
     border:2px solid #FBD7C4; display:flex; align-items:center; justify-content:center; gap:14px;
     cursor:text; transition:border-color .18s, box-shadow .18s; }
-  .lg-pin-field:focus-within { border-color:#FF8C42; box-shadow:0 0 0 4px rgba(255,140,66,.14); }
-  .lg-pin-field.err { border-color:#EE5B52; box-shadow:0 0 0 4px rgba(238,91,82,.13); }
+  .lg-pin-field:focus-within { border-color:#FF8C42; box-shadow:0 0 0 4px rgba(255,140,66,0.14); }
+  .lg-pin-field.err { border-color:#EE5B52; box-shadow:0 0 0 4px rgba(238,91,82,0.13); }
   .lg-pin-bullet { width:9px; height:9px; border-radius:50%; background:#2D4A6B; display:block; }
   .lg-pin-bullet.err { background:#EE5B52; }
-  .lg-pin-empty { width:9px; height:9px; border-radius:50%; background:rgba(45,74,107,.18); display:block; }
+  .lg-pin-empty { width:9px; height:9px; border-radius:50%; background:rgba(45,74,107,0.18); display:block; }
   .lg-pin-caret { width:2px; height:22px; background:#FF8C42; border-radius:2px; display:block;
     animation:lgBlink 1.1s steps(1) infinite; }
   @keyframes lgBlink{0%,50%{opacity:1}51%,100%{opacity:0}}
@@ -225,9 +243,9 @@ const LOGIN_CSS = `
   .lg-enter { margin-top:14px; width:200px; height:48px; border:0; border-radius:14px;
     color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
     background:linear-gradient(180deg,#FFA45C,#FF8C42);
-    box-shadow:0 10px 22px rgba(255,140,66,.38),inset 0 1px 0 rgba(255,255,255,.35);
+    box-shadow:0 10px 22px rgba(255,140,66,0.38),inset 0 1px 0 rgba(255,255,255,0.35);
     display:flex; align-items:center; justify-content:center; gap:8px; transition:.16s; }
-  .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,.46),inset 0 1px 0 rgba(255,255,255,.35); }
+  .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,0.46),inset 0 1px 0 rgba(255,255,255,0.35); }
   .lg-enter:active { transform:translateY(0); }
 
   /* success overlay */
@@ -649,6 +667,7 @@ const DEFAULT_HABITS = () => ([
 function loadAppData() {
   try {
     const raw = localStorage.getItem("dailyplanner_v3");
+    window.__hadSavedData__ = !!raw;  // remember if data existed BEFORE init
     if (raw) {
       const parsed = JSON.parse(raw);
       // Add version if missing (migration from older versions)
@@ -775,7 +794,7 @@ function CircleProgress({ pct: p, size = 80, stroke = 6, color = "#1D9E75", labe
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={stroke} />
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1)" }} />
+          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,0.2,1)" }} />
       </svg>
       {label && <div style={{ textAlign: "center", marginTop: -4 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: THEME.text }}>{label}</div>
@@ -2762,17 +2781,36 @@ export default function App() {
     };
   }, []);
 
-  // Save to localStorage immediately; debounce cloud save 2s
+  // Save on tab close/refresh — catches unsaved changes
+  useEffect(() => {
+    const handleUnload = () => {
+      if (latestData.current && !isFirstLoad.current && navigator.onLine) {
+        const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
+        // Use sendBeacon for reliable delivery on page close
+        const body = JSON.stringify([{ id: "main", data: toSave, updated_at: new Date().toISOString() }]);
+        navigator.sendBeacon
+          ? navigator.sendBeacon(SUPABASE_URL + "/rest/v1/planner_data?id=eq.main", new Blob([body], { type: "application/json" }))
+          : saveToCloud(toSave).catch(() => {});
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
+  // Save to localStorage immediately; debounce cloud save 1s
   useEffect(() => {
     localStorage.setItem("dailyplanner_v3", JSON.stringify(appData));
     if (isFirstLoad.current) return;
     localSaveTime.current = new Date();
+    window.__hasLocalChanges__ = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
       if (navigator.onLine) {
         setSyncing(true);
         await saveToCloud(toSave);
+        window.__hasLocalChanges__ = false;
+        window.__lastLocalSave__ = new Date();
         setSyncing(false);
         setLastSync(new Date());
         setOfflinePending(false);
@@ -2780,7 +2818,7 @@ export default function App() {
         enqueueOfflineSave(toSave);
         setOfflinePending(true);
       }
-    }, 2000);
+    }, 1000);
   }, [appData]);
 
   // On mount: load from cloud, merge intelligently — runs once
@@ -2791,73 +2829,93 @@ export default function App() {
       const cloudData = navigator.onLine ? await loadFromCloud() : null;
       const today = getLocalToday();
 
+      // Compute new state based on cloud + local, then set directly
       setAppData(local => {
-        let base = local;
-        if (cloudData && cloudData.lastDate) {
-          const localV = local.version || 0;
-          const cloudV = cloudData.version || 0;
-          const localTodayBlocks = local.days[today]?.blocks || [];
-          const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
-          const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
-          const localCount = countReal(localTodayBlocks);
-          const cloudCount = countReal(cloudTodayBlocks);
-
-          base = {
-            ...( cloudV >= localV ? cloudData : local ),
-            version: Math.max(localV, cloudV, DATA_VERSION),
-            goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
-            events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
-            habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
-            days: {
-              ...(cloudV >= localV ? cloudData.days : local.days),
-              [today]: localCount >= cloudCount
-                ? (local.days[today] || cloudData.days?.[today])
-                : (cloudData.days?.[today] || local.days[today])
-            }
-          };
+        if (!cloudData || !cloudData.lastDate) {
+          return applyNewDay(local, today);
         }
-        return applyNewDay(base, today);
+
+        const localIsEmpty = !window.__hadSavedData__;
+
+        if (localIsEmpty) {
+          const result = applyNewDay(cloudData, today);
+          return result;
+        }
+
+        const localV = local.version || 0;
+        const cloudV = cloudData.version || 0;
+        const localTodayBlocks = local.days[today]?.blocks || [];
+        const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
+        const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
+        const localCount = countReal(localTodayBlocks);
+        const cloudCount = countReal(cloudTodayBlocks);
+
+        const base = {
+          ...( cloudV >= localV ? cloudData : local ),
+          version: Math.max(localV, cloudV, DATA_VERSION),
+          goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
+          events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
+          habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
+          days: {
+            ...(cloudV >= localV ? cloudData.days : local.days),
+            [today]: localCount >= cloudCount
+              ? (local.days[today] || cloudData.days?.[today])
+              : (cloudData.days?.[today] || local.days[today])
+          }
+        };
+
+        const result = applyNewDay(base, today);
+        return result;
       });
 
       setSyncing(false);
       setLastSync(new Date());
-      setTimeout(() => { isFirstLoad.current = false; }, 600);
+      setTimeout(() => {
+        isFirstLoad.current = false;
+        // DO NOT force-save here — would overwrite cloud with stale local data
+      }, 1500);
     })();
   }, []);
 
-  // Poll every 90s — single GET includes updated_at, no double fetch
+  // Poll every 30s — pull changes from other devices
   useEffect(() => {
     const id = setInterval(async () => {
       if (isFirstLoad.current || !navigator.onLine || document.hidden) return;
+      // Don't poll if we just saved (avoid overwriting our own save)
+      if (window.__hasLocalChanges__) return;
       try {
         const rows = await sbFetch("GET");
         if (!rows?.length) return;
-        const cloudUpdated = rows[0]?.updated_at;
-        const localSaved = localSaveTime.current;
-        if (!cloudUpdated || !localSaved) return;
-        const cloudTime = new Date(cloudUpdated);
-        // Only pull if cloud is newer AND we haven't saved in last 10s
-        if (cloudTime > localSaved && (Date.now() - localSaved.getTime()) > 10000) {
-          const cloudData = rows[0].data;
-          if (!cloudData) return;
-          const today = getLocalToday();
-          setAppData(d => {
-            const localToday = d.days[today];
-            const localHasWork = localToday?.blocks?.some(b => b.tasks?.some(t=>!t.routine));
-            const merged = applyNewDay({
-              ...cloudData,
-              goals: { ...(cloudData.goals||{}), ...(d.goals||{}) },
-              events: dedupeById([...(cloudData.events||[]), ...(d.events||[])]),
-              habitLog: { ...(cloudData.habitLog||{}), ...(d.habitLog||{}) },
-            }, today);
-            return localHasWork
-              ? { ...merged, days: { ...merged.days, [today]: localToday } }
-              : merged;
-          });
-          setLastSync(new Date());
-        }
+        const cloudUpdated = new Date(rows[0]?.updated_at);
+        const localSaved = localSaveTime.current || new Date(0);
+        // Only pull if cloud is strictly newer than our last save
+        if (cloudUpdated <= localSaved) return;
+        const cloudData = rows[0].data;
+        if (!cloudData) return;
+        const today = getLocalToday();
+        setAppData(d => {
+          // Merge cloud into local — cloud wins for history, local wins for today if has work
+          const localToday = d.days[today];
+          const cloudToday = cloudData.days?.[today];
+          const localRealTasks = localToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
+          const cloudRealTasks = cloudToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
+          const merged = {
+            ...cloudData,
+            version: Math.max(d.version||0, cloudData.version||0, DATA_VERSION),
+            goals: { ...(cloudData.goals||{}), ...(d.goals||{}) },
+            events: dedupeById([...(cloudData.events||[]), ...(d.events||[])]),
+            habitLog: { ...(cloudData.habitLog||{}), ...(d.habitLog||{}) },
+            days: {
+              ...cloudData.days,
+              [today]: localRealTasks >= cloudRealTasks ? localToday : cloudToday
+            }
+          };
+          return merged;
+        });
+        localSaveTime.current = cloudUpdated; // update to match cloud
+        setLastSync(new Date());
       } catch {}
-    }, 90000);
+    }, 30000);
     return () => clearInterval(id);
   }, []); // stable — never recreates
 
@@ -3085,7 +3143,7 @@ export default function App() {
 
   return (
     <div className="animated-bg" style={{ minHeight: "100vh", fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
       <style>{BG_ANIM_STYLE}</style>
 
       {/* New day modal */}
