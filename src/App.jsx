@@ -2713,11 +2713,19 @@ export default function App() {
   const [offlinePending, setOfflinePending] = useState(false);
   const saveTimer = useRef(null);
   const isFirstLoad = useRef(true);
+  const userRef = useRef(null);
   const localSaveTime = useRef(null);
   const latestData = useRef(null);
 
   // Keep latestData ref current for async closures
   useEffect(() => { latestData.current = appData; }, [appData]);
+  useEffect(() => {
+    userRef.current = user;
+    if (user) {
+      // Reset first load flag so sync runs fresh for this user
+      isFirstLoad.current = true;
+    }
+  }, [user]);
 
   // Track online/offline
   useEffect(() => {
@@ -2728,7 +2736,7 @@ export default function App() {
       // Re-save latest data now that we're back online
       if (latestData.current && !isFirstLoad.current) {
         const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
-        await saveToCloud(user?.id, toSave);
+        await saveToCloud(userRef.current?.id, toSave);
         setLastSync(new Date());
       }
     };
@@ -2768,7 +2776,7 @@ export default function App() {
       const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
       if (navigator.onLine) {
         setSyncing(true);
-        await saveToCloud(user?.id, toSave);
+        await saveToCloud(userRef.current?.id, toSave);
         window.__hasLocalChanges__ = false;
         window.__lastLocalSave__ = new Date();
         setSyncing(false);
@@ -2786,7 +2794,7 @@ export default function App() {
     (async () => {
       setSyncing(true);
       if (navigator.onLine) await flushOfflineQueue();
-      const cloudData = navigator.onLine ? await loadFromCloud(user?.id) : null;
+      const cloudData = navigator.onLine ? await loadFromCloud(userRef.current?.id) : null;
       const today = getLocalToday();
 
       // Compute new state based on cloud + local, then set directly
@@ -2828,10 +2836,9 @@ export default function App() {
       setLastSync(new Date());
       setTimeout(() => {
         isFirstLoad.current = false;
-        // DO NOT force-save here — would overwrite cloud with stale local data
       }, 1500);
     })();
-  }, []);
+  }, [user]); // re-run when user logs in
 
   // Poll every 30s — pull changes from other devices
   useEffect(() => {
@@ -2840,11 +2847,11 @@ export default function App() {
       // Don't poll if we just saved (avoid overwriting our own save)
       if (window.__hasLocalChanges__) return;
       try {
-        if (!user?.id) return;
+        if (!userRef.current?.id) return;
         const { data: rows, error } = await supabase
           .from("user_data")
           .select("data, updated_at")
-          .eq("user_id", user.id)
+          .eq("user_id", userRef.current.id)
           .single();
         if (error || !rows) return;
         const cloudUpdated = new Date(rows.updated_at);
