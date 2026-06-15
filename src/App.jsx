@@ -255,6 +255,7 @@ function AuthScreen({ onAuth }) {
   );
 }
 
+
 // ── Language ────────────────────────────────────────────────────────
 const LANG = {
   ru: {
