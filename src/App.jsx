@@ -1,62 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { createClient } from "@supabase/supabase-js";
-
-// ── Supabase Client ─────────────────────────────────────────────────
-const SUPABASE_URL = "https://mahvuymxoddkiquhcngx.supabase.co";
-const SUPABASE_KEY = "sb_publishable_MbWRZ_V-R8BSEa_4GECblg_g7jdegC8";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ── Auth-aware cloud sync (uses user_data table) ───────────────────
-async function loadFromCloud(userId) {
-  if (!userId) return null;
-  try {
-    const { data, error } = await supabase
-      .from("user_data")
-      .select("data, updated_at")
-      .eq("user_id", userId)
-      .single();
-    if (error || !data) return null;
-    return { ...data.data, _cloudUpdatedAt: data.updated_at };
-  } catch(e) { console.warn("Cloud load failed:", e); return null; }
-}
-
-async function saveToCloud(userId, data) {
-  if (!userId) return;
-  try {
-    const payload = { ...data };
-    delete payload._cloudUpdatedAt;
-    const { error } = await supabase
-      .from("user_data")
-      .upsert({ user_id: userId, data: payload, updated_at: new Date().toISOString() });
-    if (error) console.warn("Cloud save error:", error);
-  } catch(e) { console.warn("Cloud save failed:", e); }
-}
-
-async function getCloudTimestamp(userId) {
-  if (!userId) return null;
-  try {
-    const { data } = await supabase
-      .from("user_data")
-      .select("updated_at")
-      .eq("user_id", userId)
-      .single();
-    return data?.updated_at || null;
-  } catch(e) { return null; }
-}
-
+import { supabase } from "./lib/supabase";
+import * as db from "./lib/db";
+import { subscribeToUserData } from "./lib/realtime";
 
 // ── Constants ───────────────────────────────────────────────────────
-const CORRECT_PASSWORD = "2104";
-const DATA_VERSION = 4; // bump when data structure changes
+const DATA_VERSION = 4;
 
 // ── Use LOCAL date (not UTC) to avoid timezone bugs ─────────────────
 function getLocalToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-// NOTE: TODAY is a function call result used at module load time for defaults only.
-// All runtime comparisons must call getLocalToday() directly.
 const TODAY = getLocalToday();
 
 // ── Better uid — timestamp + random to avoid collisions ─────────────
@@ -64,13 +19,12 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 function localDateStr(d) {
-  // Always use LOCAL date, never UTC — fixes timezone off-by-one bugs
   const dt = d instanceof Date ? d : new Date(d);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
 }
 function getDateKey(d) {
   if (d instanceof Date) return localDateStr(d);
-  return d; // already a string
+  return d;
 }
 
 function getPast7Days() {
@@ -99,7 +53,6 @@ const THEME = {
 
 const BG_GRADIENT = `linear-gradient(135deg, ${THEME.skyBlue} 0%, ${THEME.warmCream} 50%, ${THEME.peachGlow} 100%)`;
 
-// Animated background CSS — GPU optimised
 const BG_ANIM_STYLE = `
   @keyframes bgShift {
     0%   { background-position: 0% 50%; }
@@ -114,16 +67,15 @@ const BG_ANIM_STYLE = `
     animation: bgShift 55s ease infinite;
     will-change: background-position;
   }
-  /* Perf hints */
   [draggable="true"] { will-change: transform; }
   @media (prefers-reduced-motion: reduce) {
     .animated-bg { animation: none; background-position: 0% 50%; }
     [style*="animation"] { animation: none !important; }
   }
 `;
+
 // ── Login Screen CSS ────────────────────────────────────────────────
 const LOGIN_CSS = `
-
   .lg-stage { position:fixed; inset:0; overflow:hidden; font-family:'DM Sans','Manrope',system-ui,sans-serif; color:#2D4A6B; }
   .lg-bg { position:absolute; inset:0; z-index:0;
     background:linear-gradient(120deg,#D6E8FA 0%,#E4F4EC 30%,#FBF6E0 60%,#FCE7DB 100%);
@@ -133,12 +85,9 @@ const LOGIN_CSS = `
   .lg-blob.b1{width:520px;height:520px;background:#FBD7C4;right:-80px;top:-60px;}
   .lg-blob.b2{width:460px;height:460px;background:#FAF0CF;left:6%;bottom:-120px;opacity:.45;}
   .lg-blob.b3{width:380px;height:380px;background:#BBD9F5;right:18%;bottom:6%;opacity:.32;}
-
   .lg-brand { position:absolute; z-index:6; top:26px; left:30px;
     font-family:'Comfortaa',sans-serif; font-weight:700; font-size:23px;
     color:#FF8C42; letter-spacing:-.01em; }
-
-  /* theme switch bottom-right */
   .lg-switch { position:absolute; z-index:6; bottom:24px; right:24px; display:flex;
     gap:3px; padding:4px; border-radius:30px;
     background:rgba(255,255,255,0.62); backdrop-filter:blur(8px);
@@ -150,17 +99,11 @@ const LOGIN_CSS = `
   .lg-sw.on { background:#FF8C42; color:#fff;
     box-shadow:0 4px 11px rgba(255,140,66,0.42); }
   .lg-sw svg { width:100%; height:100%; }
-
-  /* layout — quote & stats: aside centered in left half, card in right */
   .lg-row { position:absolute; inset:0; z-index:2; display:flex; align-items:center; }
   .lg-row.split { padding:0 max(5vw,60px); gap:0; justify-content:space-between; }
   .lg-row.center { justify-content:center; }
-
-  /* aside takes left half, centers content within it */
   .lg-aside-wrap { flex:1 1 0; display:flex; align-items:center; justify-content:center; padding:0 40px 0 0; }
   .lg-aside { max-width:560px; width:100%; }
-
-  /* quote aside */
   .lg-q-mark { font-family:'Comfortaa',sans-serif; font-size:64px; font-weight:700;
     line-height:0; height:30px; display:block; color:rgba(255,140,66,0.55); }
   .lg-q-text { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
@@ -168,8 +111,6 @@ const LOGIN_CSS = `
     letter-spacing:-.01em; }
   .lg-q-author { font-size:14px; color:#9AAAB8; font-weight:500; }
   .lg-q-date { font-size:13px; color:#9AAAB8; margin-top:18px; }
-
-  /* stats aside */
   .lg-s-label { font-size:13px; font-weight:700; letter-spacing:.12em;
     text-transform:uppercase; color:#9AAAB8; }
   .lg-s-title { font-family:'Comfortaa',sans-serif; font-size:36px; font-weight:700;
@@ -181,15 +122,11 @@ const LOGIN_CSS = `
   .lg-s-tile b { font-size:17px; font-weight:700; color:#2D4A6B; display:block; }
   .lg-s-tile span { font-size:13px; color:#9AAAB8; font-weight:500; }
   .lg-s-note { font-size:13.5px; font-style:italic; color:#9AAAB8; margin-top:18px; }
-
-  /* anim blobs inside aside */
   .lg-anim { position:relative; width:100%; height:200px; }
   .lg-anim-blob { position:absolute; border-radius:50%; filter:blur(28px); }
   @keyframes lgDrift1{0%,100%{transform:translate(0,0)}50%{transform:translate(18px,-22px)}}
   @keyframes lgDrift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-14px,20px)}}
   @keyframes lgDrift3{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,14px)}}
-
-  /* card */
   .lg-card-zone { flex:0 0 auto; display:flex; justify-content:center; }
   .lg-card { width:300px; background:#fff; border-radius:24px; padding:36px 34px 32px;
     box-shadow:0 26px 64px rgba(58,72,98,0.17),0 5px 16px rgba(58,72,98,0.07);
@@ -201,8 +138,6 @@ const LOGIN_CSS = `
     color:#2D4A6B; line-height:1; margin:0; letter-spacing:-.02em; }
   .lg-card-title-ex { font-style:italic; display:inline-block; transform:skewX(-12deg); }
   .lg-card-sub { font-size:13px; color:#9AAAB8; font-weight:500; margin:10px 0 22px; text-align:center; }
-
-  /* pin field */
   .lg-pin-field { position:relative; width:200px; height:56px; border-radius:14px; background:#fff;
     border:2px solid #FBD7C4; display:flex; align-items:center; justify-content:center; gap:14px;
     cursor:text; transition:border-color .18s, box-shadow .18s; }
@@ -214,11 +149,9 @@ const LOGIN_CSS = `
   .lg-pin-caret { width:2px; height:22px; background:#FF8C42; border-radius:2px; display:block;
     animation:lgBlink 1.1s steps(1) infinite; }
   @keyframes lgBlink{0%,50%{opacity:1}51%,100%{opacity:0}}
-
   .lg-err-txt { height:16px; font-size:12.5px; font-weight:600; color:#EE5B52;
     margin-top:10px; opacity:0; transition:opacity .2s; }
   .lg-stage.is-error .lg-err-txt { opacity:1; }
-
   .lg-enter { margin-top:14px; width:200px; height:48px; border:0; border-radius:14px;
     color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
     background:linear-gradient(180deg,#FFA45C,#FF8C42);
@@ -226,8 +159,6 @@ const LOGIN_CSS = `
     display:flex; align-items:center; justify-content:center; gap:8px; transition:.16s; }
   .lg-enter:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(255,140,66,0.46),inset 0 1px 0 rgba(255,255,255,0.35); }
   .lg-enter:active { transform:translateY(0); }
-
-  /* success overlay */
   .lg-success { position:absolute; inset:0; z-index:10; display:flex;
     flex-direction:column; align-items:center; justify-content:center; gap:16px;
     opacity:0; pointer-events:none; transition:opacity .5s; }
@@ -237,213 +168,11 @@ const LOGIN_CSS = `
   .lg-success p { font-size:15px; color:#9AAAB8; margin:0; }
   .lg-sun { width:64px; height:64px; color:#FF8C42; animation:lgSpinSun 9s linear infinite; }
   @keyframes lgSpinSun{to{transform:rotate(360deg)}}
-
-  /* caption */
   .lg-caption { position:absolute; z-index:6; bottom:20px; left:50%; transform:translateX(-50%);
     font-size:12px; color:#9AAAB8; font-weight:500; white-space:nowrap; }
 `;
 
-// ── Login Icons ──────────────────────────────────────────────────────
-const LG_ICON = {
-  quote: (p={}) => <svg viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M4 11.5c0-3 1.8-5.2 4.4-6l.6 1.4C7.4 7.5 6.4 8.7 6.3 10c.2-.1.5-.2.9-.2 1.2 0 2.1.9 2.1 2.2 0 1.3-1 2.3-2.4 2.3C5.2 14.3 4 13 4 11.5zm6.7 0c0-3 1.8-5.2 4.4-6l.6 1.4c-1.6.6-2.6 1.8-2.7 3.1.2-.1.5-.2.9-.2 1.2 0 2.1.9 2.1 2.2 0 1.3-1 2.3-2.4 2.3-1.7 0-2.9-1.3-2.9-2.8z"/></svg>,
-  spark: (p={}) => <svg viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M10 2l1.4 4.2L15.6 7l-3.4 2.6 1.2 4.3L10 11.4 6.6 13.9l1.2-4.3L4.4 7l4.2-.8L10 2z"/><circle cx="15.5" cy="14.5" r="1.4"/><circle cx="4.8" cy="13.8" r="1"/></svg>,
-  stats: (p={}) => <svg viewBox="0 0 20 20" fill="none" {...p}><rect x="3" y="11" width="3.4" height="6" rx="1.2" fill="currentColor"/><rect x="8.3" y="7" width="3.4" height="10" rx="1.2" fill="currentColor"/><rect x="13.6" y="4" width="3.4" height="13" rx="1.2" fill="currentColor"/></svg>,
-  back: (p={}) => <svg viewBox="0 0 24 24" fill="none" {...p}><path d="M9.5 7L5 12l4.5 5M5 12h13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  sun: (p={}) => <svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="12" cy="12" r="4.4" fill="currentColor"/><g stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7L17 17M7 7L5.3 5.3"/></g></svg>,
-};
-
-const LG_QUOTES = [
-  { t: 'Делай сегодня то, что другие не хотят, — завтра будешь жить так, как другие не могут.', a: '— Джерри Райс' },
-  { t: 'Дисциплина — это мост между целями и их достижением.', a: '— Джим Рон' },
-  { t: 'Маленькие шаги каждый день приводят к большим переменам.', a: '— Народная мудрость' },
-  { t: 'Лучшее время начать было вчера. Следующее лучшее — сейчас.', a: '— Китайская пословица' },
-  { t: 'Ты не обязан быть великим, чтобы начать. Но ты должен начать, чтобы стать великим.', a: '— Зиг Зиглар' },
-  { t: 'Победитель — это просто мечтатель, который не сдался.', a: '— Нельсон Мандела' },
-];
-
-// ── Login: Pin Dots ──────────────────────────────────────────────────
-function LgPinDots({ len, error }) {
-  return (
-    <div className="lg-dots">
-      {[0,1,2,3].map(i => (
-        <span key={i} className={'lg-dot' + (i < len ? ' fill' : '')}/>
-      ))}
-    </div>
-  );
-}
-
-// ── Login: Keypad ────────────────────────────────────────────────────
-function LgKeypad({ onKey, pressed }) {
-  const keys = ['1','2','3','4','5','6','7','8','9','','0','back'];
-  return (
-    <div className="lg-keypad">
-      {keys.map((k,i) => {
-        if (k === '') return <span key={i} className="lg-key ghost"/>;
-        if (k === 'back') return (
-          <button key={i} className={'lg-key act' + (pressed==='back' ? ' press' : '')}
-            onClick={() => onKey('back')}>
-            {LG_ICON.back({ width:20, height:20 })}
-          </button>
-        );
-        return (
-          <button key={i} className={'lg-key' + (pressed===k ? ' press' : '')}
-            onClick={() => onKey(k)}>{k}</button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Login: Card (center piece) ───────────────────────────────────────
-function LgCard({ pin, error, onSubmit, onKey }) {
-  const inputRef = useRef(null);
-  return (
-    <div className="lg-card-zone">
-      <div className="lg-card" onClick={() => inputRef.current?.focus()}>
-        <h1 className="lg-card-title">Мой день</h1>
-        <p className="lg-card-sub">Твоя личная система жизни</p>
-
-        {/* Pin field */}
-        <div className={'lg-pin-field' + (error ? ' err' : '')}>
-          {[0,1,2,3].map(i => {
-            const filled = i < pin.length;
-            const isActive = i === pin.length;
-            return (
-              <span key={i}>
-                {filled
-                  ? <span className={'lg-pin-bullet' + (error ? ' err' : '')}/>
-                  : isActive
-                    ? <span className="lg-pin-caret"/>
-                    : <span className="lg-pin-empty"/>
-                }
-              </span>
-            );
-          })}
-          <input
-            ref={inputRef}
-            type="tel"
-            inputMode="numeric"
-            maxLength={4}
-            value={pin}
-            onChange={e => {
-              const v = e.target.value.replace(/\D/g,'');
-              if (v.length <= 4) {
-                // simulate key presses
-                if (v.length > pin.length) onKey(v[v.length-1]);
-                else if (v.length < pin.length) onKey('back');
-              }
-            }}
-            autoFocus
-            style={{ position:'absolute', inset:0, opacity:0, border:0, background:'transparent', cursor:'text', fontSize:16 }}
-          />
-        </div>
-
-        <div className="lg-err-txt">Неверный пин-код</div>
-
-        <button className="lg-enter" onClick={onSubmit}>
-          Войти
-          <svg viewBox="0 0 24 24" fill="none" width={18} height={18}><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Login: Aside Quote ───────────────────────────────────────────────
-function LgAsideQuote() {
-  const q = LG_QUOTES[new Date().getDate() % LG_QUOTES.length];
-  const d = new Date();
-  const days = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
-  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  return (
-    <div className="lg-aside">
-      <span className="lg-q-mark">&ldquo;</span>
-      <p className="lg-q-text">{q.t}</p>
-      <span className="lg-q-author">{q.a}</span>
-      <p className="lg-q-date">{days[d.getDay()]}, {d.getDate()} {months[d.getMonth()]}</p>
-    </div>
-  );
-}
-
-// ── Login: Aside Anim (decorative background blobs) ─────────────────
-function LgAsideAnim() {
-  return (
-    <>
-      {[
-        { w:90,h:90,l:'12%',t:'20%',bg:'#BBD9F5',anim:'lgDrift1 7s ease-in-out infinite' },
-        { w:70,h:70,l:'30%',t:'60%',bg:'#FBD7C4',anim:'lgDrift2 9s ease-in-out infinite' },
-        { w:110,h:110,l:'20%',t:'40%',bg:'#BFE6D2',anim:'lgDrift3 10s ease-in-out infinite' },
-        { w:55,h:55,l:'38%',t:'15%',bg:'#FAF0CF',anim:'lgDrift1 6s ease-in-out infinite' },
-      ].map((b,i) => (
-        <div key={i} style={{
-          position:'absolute', width:b.w, height:b.h, left:b.l, top:b.t,
-          borderRadius:'50%', background:b.bg, filter:'blur(28px)',
-          animation:b.anim, zIndex:1,
-        }}/>
-      ))}
-    </>
-  );
-}
-
-// ── Login: Aside Stats ───────────────────────────────────────────────
-function LgAsideStats() {
-  const data = (() => { try { const r=localStorage.getItem("dailyplanner_v3"); return r?JSON.parse(r):null; } catch{return null;} })();
-  const yesterday = (() => { const d=new Date(); d.setDate(d.getDate()-1); return localDateStr(d); })();
-  const yBlocks = data?.days?.[yesterday]?.blocks || [];
-  const yTasks = yBlocks.flatMap(b=>b.tasks);
-  const yDone = yTasks.filter(t=>t.status==="done").length;
-  const yTotal = yTasks.length;
-  const yPct = yTotal>0 ? Math.round(yDone/yTotal*100) : 0;
-  const habits = data?.habits || [];
-  const habitLog = data?.habitLog || {};
-  let maxStreak = 0;
-  habits.forEach(h => {
-    let s=0; const d=new Date();
-    for(let i=0;i<60;i++){
-      if(habitLog[localDateStr(d)]?.[h.id]){s++;d.setDate(d.getDate()-1);}else break;
-    }
-    if(s>maxStreak) maxStreak=s;
-  });
-  const goodDays = Array.from({length:7},(_,i)=>{
-    const d=new Date(); d.setDate(d.getDate()-i);
-    const bl=data?.days?.[localDateStr(d)]?.blocks||[];
-    const t=bl.flatMap(b=>b.tasks);
-    return t.length>0&&t.filter(t=>t.status==="done").length/t.length>=0.8;
-  }).filter(Boolean).length;
-
-  return (
-    <div className="lg-aside">
-      <div className="lg-s-label">Твой прогресс</div>
-      <div className="lg-s-title">
-        {yPct===100?"Идеальный день! 🏆":yPct>=70?"Отличный результат! 🔥":yPct>=40?"Хороший задел 👍":"Продолжай в том же духе 💪"}
-      </div>
-      <div className="lg-s-tile" style={{ marginBottom:12 }}>
-        <span style={{ fontSize:28 }}>⭐</span>
-        <div>
-          <b>{yDone}/{yTotal} задач вчера</b>
-          <span>{yPct}% выполнено</span>
-        </div>
-      </div>
-      <div className="lg-s-tile" style={{ marginBottom:12 }}>
-        <span style={{ fontSize:28 }}>🔥</span>
-        <div>
-          <b>{maxStreak} дней серия</b>
-          <span>лучшая активная привычка</span>
-        </div>
-      </div>
-      <div className="lg-s-tile">
-        <span style={{ fontSize:28 }}>📅</span>
-        <div>
-          <b>{goodDays} из 7 дней</b>
-          <span>выполнено на 80%+</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Password Screen ──────────────────────────────────────────────────
-// ── Auth Screen (Email) ─────────────────────────────────────────────
+// ── Auth Screen CSS ─────────────────────────────────────────────────
 const AUTH_CSS = `
   .auth-stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     background: linear-gradient(125deg,#DBEAFB 0%,#E6F5ED 30%,#FCF7E2 60%,#FDEAE0 100%);
@@ -475,7 +204,7 @@ const AUTH_CSS = `
 `;
 
 function AuthScreen({ onAuth }) {
-  const [mode, setMode]       = useState("login"); // "login" | "register"
+  const [mode, setMode]       = useState("login");
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -609,13 +338,13 @@ const DEFAULT_HABITS = () => ([
   { id:"h3", names:{ru:"Ранний подъём",en:"Early rise"}, color:"#FF8C42" },
 ]);
 
+// ── localStorage fallback (offline) ─────────────────────────────────
 function loadAppData() {
   try {
     const raw = localStorage.getItem("dailyplanner_v3");
-    window.__hadSavedData__ = !!raw;  // remember if data existed BEFORE init
+    window.__hadSavedData__ = !!raw;
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Add version if missing (migration from older versions)
       if (!parsed.version) parsed.version = DATA_VERSION;
       return parsed;
     }
@@ -627,47 +356,12 @@ function loadAppData() {
     habitLog: {},
     goals: {},
     events: [],
-    lastDate: TODAY
+    lastDate: TODAY,
   };
-}
-
-// ── Offline queue — store pending saves when offline ─────────────────
-const OFFLINE_QUEUE_KEY = "planner_offline_queue";
-function getOfflineQueue() {
-  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]"); } catch { return []; }
-}
-function setOfflineQueue(q) {
-  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
-}
-function enqueueOfflineSave(data) {
-  const q = [{ data, ts: new Date().toISOString() }]; // keep only latest
-  setOfflineQueue(q);
-}
-async function flushOfflineQueue() {
-  const q = getOfflineQueue();
-  if (!q.length) return;
-  try {
-    const last = q[q.length - 1];
-    await saveToCloud(window.__currentUserId__, last.data);
-    setOfflineQueue([]);
-  } catch {}
-}
-
-// ── Auto-cleanup: compress days older than 90 days ───────────────────
-function calcPct(blocks) {
-  const all = (blocks || []).flatMap(b => b.tasks || []);
-  if (!all.length) return 0;
-  return Math.round((all.filter(t => t.status === "done").length / all.length) * 100);
-}
-
-// ── Auto-cleanup disabled — preserving full history ──────────────────
-function compressOldDays(days) {
-  return days; // Keep all data intact
 }
 
 const DOW_NAMES_RU = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 const DOW_NAMES_EN = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-// routineDays: array of 0-6 (0=Sun). Empty/undefined = every day.
 
 function buildNewDay(prevBlocks, dateStr) {
   const dow = dateStr
@@ -679,8 +373,6 @@ function buildNewDay(prevBlocks, dateStr) {
       if (!t.routineDays || t.routineDays.length === 0) return true;
       return t.routineDays.includes(dow);
     }).map(t => ({ ...t, id: uid(), status: "pending" }));
-
-    // Include block if: has routine tasks OR is pinned
     if (routineTasks.length > 0 || block.pinned) {
       return { ...block, id: block.id, tasks: routineTasks };
     }
@@ -688,7 +380,6 @@ function buildNewDay(prevBlocks, dateStr) {
   }).filter(Boolean);
 }
 
-// Find most recent past day that has routine tasks — use as template source
 function findRoutineSource(days, today) {
   const td = today || getLocalToday();
   const past = Object.keys(days).filter(k => k < td && !days[k]?.compressed).sort().reverse();
@@ -699,6 +390,15 @@ function findRoutineSource(days, today) {
   return null;
 }
 
+function calcPct(blocks) {
+  const all = (blocks || []).flatMap(b => b.tasks || []);
+  if (!all.length) return 0;
+  return Math.round((all.filter(t => t.status === "done").length / all.length) * 100);
+}
+
+function compressOldDays(days) {
+  return days;
+}
 
 function dayBgColor(p) {
   if (p === null) return "rgba(255,255,255,0.4)";
@@ -714,6 +414,43 @@ function dayFgColor(p) {
   if (p < 70) return "#7A5A00";
   if (p < 100) return "#085041";
   return "#fff";
+}
+
+function applyNewDay(data, today) {
+  const td = today || getLocalToday();
+  const last = data.lastDate;
+  const todayData = data.days[td];
+  const todayBlocks = todayData?.blocks || [];
+  const todayHasRoutines = todayBlocks.some(b => b.tasks?.some(t => t.routine));
+  const todayHasRealTasks = todayBlocks.some(b => b.tasks?.some(t => !t.routine));
+
+  if (!last || last === td) {
+    if (!todayData) {
+      return { ...data, days: { ...data.days, [td]: { blocks: DEFAULT_BLOCKS() } }, lastDate: td };
+    }
+    return { ...data, lastDate: td };
+  }
+
+  const routineSource = findRoutineSource(data.days, td) || DEFAULT_BLOCKS();
+  const routineBlocks = buildNewDay(routineSource, td);
+
+  if (!todayData) {
+    return { ...data, days: { ...data.days, [td]: { blocks: routineBlocks } }, lastDate: td };
+  }
+  if (todayHasRealTasks) {
+    return { ...data, lastDate: td };
+  }
+  if (!todayHasRoutines && routineBlocks.length > 0) {
+    const existingIds = new Set(todayBlocks.map(b => b.id));
+    const toAdd = routineBlocks.filter(b => !existingIds.has(b.id));
+    return { ...data, days: { ...data.days, [td]: { blocks: [...todayBlocks, ...toAdd] } }, lastDate: td };
+  }
+  return { ...data, lastDate: td };
+}
+
+function dedupeById(arr) {
+  const seen = new Set();
+  return arr.filter(x => { if (!x?.id || seen.has(x.id)) return false; seen.add(x.id); return true; });
 }
 
 // ── Editable Title ──────────────────────────────────────────────────
@@ -767,7 +504,7 @@ function BarChart({ data, color = "#378ADD" }) {
   );
 }
 
-// ── Habit Area Chart (combined, all habits summed) ──────────────────
+// ── Habit Area Chart ────────────────────────────────────────────────
 function HabitAreaChart({ data, color }) {
   const W = 580, H = 130, PAD = { t: 16, r: 16, b: 28, l: 40 };
   const iw = W - PAD.l - PAD.r, ih = H - PAD.t - PAD.b;
@@ -862,7 +599,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
     return streak;
   };
 
-  // ── Combined chart data: sum of all habits per day/week/month ──
   const getCombinedChartData = () => {
     if (period === "week") {
       return getWeekDays().map((dk, i) => ({
@@ -871,7 +607,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
       }));
     }
     if (period === "month") {
-      // per-day for 30 days
       return getMonthDays().map(dk => {
         const d = new Date(dk + "T12:00:00");
         return {
@@ -880,7 +615,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
         };
       });
     }
-    // year: per month, count avg done per day * days
     return Array.from({ length: 12 }, (_, m) => {
       const totals = habits.map(h => getMonthPct(h.id, m));
       const totalDone = totals.reduce((a, t) => a + t.done, 0);
@@ -905,7 +639,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
 
   return (
     <div className="hb-card">
-      {/* Header — exact design */}
       <div className="hb-card-hd">
         <div className="hb-card-ic">
           <svg viewBox="0 0 24 24" fill="none"><path d="M19 12a7 7 0 01-12 5M5 12a7 7 0 0112-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M17 3v4h-4M7 21v-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -914,7 +647,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
         <button className="hb-card-link">{L.habitsGrid}</button>
       </div>
 
-      {/* Table */}
       <div style={{ overflowX:"auto" }}>
         <div className={"htable " + period}>
           <div className="corner"/>
@@ -962,7 +694,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
           })}
         </div>
 
-        {/* Add habit */}
         {addingHabit ? (
           <div className="hb-form">
             <input autoFocus value={newHabitName} onChange={e=>setNewHabitName(e.target.value)}
@@ -986,7 +717,6 @@ function HabitGrid({ habits, habitLog, lang, period, onToggle, onAddHabit, onDel
         )}
       </div>
 
-      {/* Progress + chart */}
       {habits.length > 0 && (
         <div className="hb-prog">
           <div className="hb-prog-hd">
@@ -1048,7 +778,7 @@ function WeatherWidget({ lang }) {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-          () => fetchWeather(55.75, 37.62) // fallback Moscow
+          () => fetchWeather(55.75, 37.62)
         );
       }
     } else {
@@ -1092,7 +822,7 @@ function WeatherWidget({ lang }) {
   );
 }
 
-// ── Routine Label (editable) ─────────────────────────────────────────
+// ── Routine Label ────────────────────────────────────────────────────
 function RoutineLabel({ task, onToggle, onChangeLabel, onChangeDays, lang }) {
   const [editing, setEditing]   = useState(false);
   const [val, setVal]           = useState(task.routineLabel || "🔄 Рутина");
@@ -1130,7 +860,6 @@ function RoutineLabel({ task, onToggle, onChangeLabel, onChangeDays, lang }) {
 
   return (
     <div style={{ display:"flex", gap:2, flexShrink:0, alignItems:"center" }}>
-      {/* Toggle routine on/off */}
       <button onClick={onToggle}
         style={{ fontSize:10, padding:"2px 7px", borderRadius:10,
           border:`1px solid ${isOn?"#1D9E75":"rgba(200,200,200,0.6)"}`,
@@ -1165,7 +894,6 @@ function RoutineLabel({ task, onToggle, onChangeLabel, onChangeDays, lang }) {
         />
       )}
 
-      {/* Days popup via portal */}
       {isOn && showDays && createPortal(
         <>
           <div style={{ position:"fixed", inset:0, zIndex:8000 }} onClick={()=>setShowDays(false)}/>
@@ -1210,7 +938,7 @@ function RoutineLabel({ task, onToggle, onChangeLabel, onChangeDays, lang }) {
   );
 }
 
-// ── Backlog (collapsible, no date) ───────────────────────────────────
+// ── Backlog Panel ────────────────────────────────────────────────────
 function BacklogPanel({ backlog, lang, onUpdate }) {
   const L = LANG[lang];
   const [open, setOpen] = useState(false);
@@ -1237,7 +965,6 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
 
   return (
     <div style={{ background:"rgba(255,255,255,0.55)", borderRadius:16, border:"1px solid rgba(255,255,255,0.7)", backdropFilter:"none", marginTop:16, overflow:"hidden" }}>
-      {/* Header - clickable to toggle */}
       <div onClick={()=>setOpen(o=>!o)}
         style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", userSelect:"none" }}>
         <span style={{ fontSize:16, transition:"transform 0.2s", display:"inline-block", transform: open?"rotate(90deg)":"rotate(0deg)" }}>▶</span>
@@ -1257,7 +984,6 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
           style={{ border:"none", background:"transparent", fontSize:13, cursor:"pointer", color:THEME.textLight, padding:"0 4px" }} title={lang==="ru"?"Переименовать":"Rename"}>✏️</button>
       </div>
 
-      {/* Body */}
       {open && (
         <div style={{ borderTop:"1px solid rgba(255,255,255,0.5)", padding:"10px 18px 16px" }}>
           {items.length===0 && !addingItem && (
@@ -1268,17 +994,14 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
           {items.map(item => (
             <div key={item.id} style={{ marginBottom:6 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
-                {/* Checkbox */}
                 <button onClick={()=>toggleDone(item.id)}
                   style={{ width:20,height:20,borderRadius:"50%",border:`1.5px solid ${item.done?"#1D9E75":"rgba(200,200,200,0.8)"}`,background:item.done?"#1D9E75":"rgba(255,255,255,0.6)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
                   {item.done&&<span style={{ color:"#fff",fontSize:10,fontWeight:700 }}>✓</span>}
                 </button>
-                {/* Name */}
                 <div style={{ flex:1, minWidth:0 }}>
                   <EditableTitle value={item.name} onChange={v=>updateItem(item.id,{name:v})}
                     style={{ fontSize:13, color:item.done?THEME.textLight:THEME.text, textDecoration:item.done?"line-through":"none" }}/>
                 </div>
-                {/* Expand desc */}
                 <button onClick={()=>setExpandedId(expandedId===item.id?null:item.id)}
                   style={{ fontSize:11, border:"1px solid rgba(200,200,200,0.4)", borderRadius:8, background:"rgba(255,255,255,0.4)", color:THEME.textLight, cursor:"pointer", padding:"2px 8px", fontFamily:"inherit" }}>
                   {item.desc ? "📝" : "+"}{lang==="ru"?" описание":" desc"}
@@ -1286,7 +1009,6 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
                 <button onClick={()=>deleteItem(item.id)}
                   style={{ border:"none",background:"transparent",color:"#D3D1C7",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0 }}>×</button>
               </div>
-              {/* Description / link area */}
               {expandedId===item.id && (
                 <div style={{ padding:"8px 0 4px 28px" }}>
                   <textarea
@@ -1296,7 +1018,6 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
                     rows={3}
                     style={{ width:"100%", boxSizing:"border-box", border:"1px solid rgba(200,200,200,0.5)", borderRadius:10, padding:"8px 10px", fontSize:12, fontFamily:"inherit", background:"rgba(255,255,255,0.65)", outline:"none", resize:"vertical", color:THEME.text, lineHeight:1.5 }}
                   />
-                  {/* Auto-detect links */}
                   {item.desc && item.desc.match(/https?:\/\/\S+/) && (
                     <a href={item.desc.match(/https?:\/\/\S+/)[0]} target="_blank" rel="noopener noreferrer"
                       style={{ fontSize:11, color:"#378ADD", textDecoration:"underline", display:"block", marginTop:4 }}>
@@ -1308,7 +1029,6 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
             </div>
           ))}
 
-          {/* Add item */}
           {addingItem ? (
             <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
               <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)}
@@ -1336,8 +1056,7 @@ function BacklogPanel({ backlog, lang, onUpdate }) {
   );
 }
 
-// ── Draggable Block List ────────────────────────────────────────────
-// ── Block Color Picker (inline, no portal needed) ───────────────────
+// ── Block Color Picker ───────────────────────────────────────────────
 function BlockColorPicker({ currentId, onChange }) {
   const [open, setOpen] = useState(false);
   const col = BLOCK_COLORS.find(c => c.id === currentId) || BLOCK_COLORS[0];
@@ -1362,12 +1081,13 @@ function BlockColorPicker({ currentId, onChange }) {
   );
 }
 
+// ── Draggable Blocks ─────────────────────────────────────────────────
 function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateBlock, onDeleteBlock, onAddTask, onDeleteTask, onSetTaskStatus, onUpdateTaskName, onToggleRoutine, onUpdateRoutineLabel, onUpdateRoutineDays, onReorder }) {
   const L = LANG[lang];
-  const dragIdx = useRef(null);       // block drag
-  const taskDrag = useRef(null);      // { blockId, taskIdx }
+  const dragIdx = useRef(null);
+  const taskDrag = useRef(null);
   const [dragOver, setDragOver] = useState(null);
-  const [taskDragOver, setTaskDragOver] = useState(null); // { blockId, taskIdx }
+  const [taskDragOver, setTaskDragOver] = useState(null);
   const [addingTask, setAddingTask] = useState(null);
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskType, setNewTaskType] = useState("daily");
@@ -1388,7 +1108,6 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
 
   return (
     <div>
-      {/* Day progress v17 */}
       <div className="v17-progress">
         <div className="v17-prog-top">
           <div>
@@ -1401,7 +1120,6 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
         <div className="v17-prog-count">{doneT.length} из {allT.length} {L.tasksOf}</div>
       </div>
 
-      {/* Blocks */}
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         {blocks.map((block, idx) => {
           const col = BLOCK_COLORS.find(c => c.id === block.colorId) || BLOCK_COLORS[0];
@@ -1428,7 +1146,6 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
                 opacity: dragIdx.current === idx ? 0.5 : 1,
                 cursor: isEditable ? "grab" : "default",
               }}>
-              {/* Block header v17 */}
               <div className="v17-block-head">
                 {isEditable && <span style={{ color:"#C8BFB0", fontSize:14, cursor:"grab", userSelect:"none" }}>⠿</span>}
                 <div className="v17-block-chip" style={{ background: col.bg }}>
@@ -1454,18 +1171,14 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
                   )}
                 </div>
               </div>
-              {/* Progress stripe v17 */}
               <div className="v17-stripe" style={{ background: "rgba(45,74,107,0.06)" }}>
                 <div style={{ height:"100%", width: bp + "%", background: col.accent, transition:"width 0.5s ease" }}/>
               </div>
-              {/* Tasks v17 */}
               <div className="v17-block-body">
                 {block.tasks.length === 0 && <div style={{ padding:"10px 8px", fontSize:13, color:"#9AAAB8", fontStyle:"italic" }}>{L.noTasks}</div>}
                 {block.tasks.map((task, taskIdx) => {
                   const s = sc[task.status];
                   const tdo = taskDragOver?.blockId===block.id && taskDragOver?.taskIdx===taskIdx;
-                  const isDone = task.status === "done";
-                  const isFail = task.status === "failed";
                   return (
                     <div key={task.id}
                       draggable={isEditable}
@@ -1556,7 +1269,6 @@ function DraggableBlocks({ blocks, lang, isEditable, isStatusEditable, onUpdateB
           );
         })}
 
-        {/* Add block v17 */}
         {isEditable && (addingBlock ? (
           <div style={{ background:"#fff",border:"1px solid #E8EEF4",borderRadius:24,padding:20 }}>
             <input autoFocus value={newBlockName} onChange={e=>setNewBlockName(e.target.value)}
@@ -1612,19 +1324,16 @@ function FullGridCalendar({ appData, lang, onSelectDay, selectedDay }) {
 
   return (
     <div style={{ background:"rgba(255,255,255,0.55)", borderRadius:16, border:"1px solid rgba(255,255,255,0.7)", backdropFilter:"none", overflow:"hidden" }}>
-      {/* Month nav */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.5)" }}>
         <button onClick={()=>setVd(new Date(yr,mo-1,1))} style={{ border:"1px solid rgba(255,255,255,0.7)", borderRadius:8, background:"rgba(255,255,255,0.5)", padding:"4px 14px", cursor:"pointer", fontSize:18, color:THEME.text }}>‹</button>
         <span style={{ fontSize:16, fontWeight:700, color:THEME.text }}>{L.months[mo]} {yr}</span>
         <button onClick={()=>setVd(new Date(yr,mo+1,1))} style={{ border:"1px solid rgba(255,255,255,0.7)", borderRadius:8, background:"rgba(255,255,255,0.5)", padding:"4px 14px", cursor:"pointer", fontSize:18, color:THEME.text }}>›</button>
       </div>
-      {/* Day headers */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
         {L.days.map(d => (
           <div key={d} style={{ padding:"8px 4px", textAlign:"center", fontSize:11, fontWeight:600, color:THEME.textLight, letterSpacing:0.5 }}>{d}</div>
         ))}
       </div>
-      {/* Weeks */}
       {weeks.map((week, wi) => (
         <div key={wi} style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom: wi<weeks.length-1 ? "1px solid rgba(255,255,255,0.3)" : "none", minHeight:100 }}>
           {week.map((cell, ci) => {
@@ -1640,19 +1349,16 @@ function FullGridCalendar({ appData, lang, onSelectDay, selectedDay }) {
                   cursor: cell.key ? "pointer" : "default", minHeight:90, position:"relative",
                   transition:"background 0.15s",
                 }}>
-                {/* Day number */}
                 <div style={{ marginBottom:4 }}>
                   <span style={{
                     fontSize:13, fontWeight: cell.isToday ? 700 : 400,
-                    color: cell.isToday ? THEME.sunsetDeep : cell.inMonth ? THEME.text : THEME.textLight,
+                    color: cell.isToday ? "#fff" : cell.inMonth ? THEME.text : THEME.textLight,
                     display:"inline-flex", alignItems:"center", justifyContent:"center",
                     width: cell.isToday ? 24 : "auto", height: cell.isToday ? 24 : "auto",
                     borderRadius: cell.isToday ? "50%" : 0,
                     background: cell.isToday ? THEME.sunsetApricot : "transparent",
-                    color: cell.isToday ? "#fff" : cell.inMonth ? THEME.text : THEME.textLight,
                   }}>{cell.dn || ""}</span>
                 </div>
-                {/* Task pills */}
                 {cell.tasks.map((task, ti) => {
                   const bColor = blockColors[ti] || "#B4B2A9";
                   return (
@@ -1668,13 +1374,11 @@ function FullGridCalendar({ appData, lang, onSelectDay, selectedDay }) {
                     </div>
                   );
                 })}
-                {/* More indicator */}
                 {cell.key && appData.days[cell.key]?.blocks?.flatMap(b=>b.tasks).length > 4 && (
                   <div style={{ fontSize:9, color:THEME.textLight, marginTop:2 }}>
                     +{appData.days[cell.key].blocks.flatMap(b=>b.tasks).length - 4} {lang==="ru"?"ещё":"more"}
                   </div>
                 )}
-                {/* Progress dot */}
                 {cell.p !== null && (
                   <div style={{ position:"absolute", top:5, right:5, width:6, height:6, borderRadius:"50%", background: cell.p===100?"#1D9E75":cell.p>50?"#D4A017":"#D4537E" }}/>
                 )}
@@ -1773,13 +1477,11 @@ function QuickLinks({ lang }) {
       </button>
       {open && (
         <div style={{ position:"absolute", top:"calc(100% + 6px)", right:0, zIndex:300, background:"rgba(255,255,255,0.97)", backdropFilter:"none", borderRadius:16, border:"1px solid rgba(255,255,255,0.8)", boxShadow:"0 8px 40px rgba(0,0,0,0.12)", minWidth:260, overflow:"hidden" }}>
-          {/* Links list */}
           <div style={{ padding:"8px 0" }}>
             {links.map(link => (
               <div key={link.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 14px", transition:"background 0.1s" }}
                 onMouseEnter={e=>e.currentTarget.style.background="rgba(255,176,124,0.08)"}
                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                {/* Icon picker */}
                 <div style={{ position:"relative" }}>
                   <span style={{ fontSize:18, cursor:"pointer" }} title="Нажми чтобы сменить иконку"
                     onClick={() => {
@@ -1798,7 +1500,6 @@ function QuickLinks({ lang }) {
               </div>
             ))}
           </div>
-          {/* Add new */}
           {editing && (
             <div style={{ padding:"10px 14px", borderTop:"1px solid rgba(200,200,200,0.2)" }}>
               <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
@@ -1822,7 +1523,6 @@ function QuickLinks({ lang }) {
               </button>
             </div>
           )}
-          {/* Edit toggle */}
           <div style={{ padding:"8px 14px", borderTop:"1px solid rgba(200,200,200,0.15)", display:"flex", justifyContent:"flex-end" }}>
             <button onClick={() => setEditing(e => !e)}
               style={{ fontSize:11, color:THEME.textLight, background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit" }}>
@@ -1837,10 +1537,10 @@ function QuickLinks({ lang }) {
 
 // ── Goals Panel ──────────────────────────────────────────────────────
 const MONTH_COLORS = [
-  "#5B9BD5","#4A90D9","#3A7BC8","#2E86AB", // Jan-Apr холодные
-  "#4CAF7D","#43A868","#3D9E5A",            // May-Jul переход
-  "#F4A261","#E76F51","#E63946",            // Aug-Oct теплые
-  "#C1121F","#9D0208",                      // Nov-Dec горячие
+  "#5B9BD5","#4A90D9","#3A7BC8","#2E86AB",
+  "#4CAF7D","#43A868","#3D9E5A",
+  "#F4A261","#E76F51","#E63946",
+  "#C1121F","#9D0208",
 ];
 const MONTH_NAMES_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const MONTH_NAMES_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -1856,9 +1556,7 @@ function GoalItem({ goal, period, onDelete, onSetStatus, onUpdateText, dragHandl
       draggable
       {...dragHandlers}
       style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"10px 0", borderBottom:"1px solid rgba(255,255,255,0.4)", cursor:"grab", userSelect:"none", transition:"opacity 0.15s" }}>
-      {/* Drag handle */}
       <span style={{ color:"#D3D1C7", fontSize:14, paddingTop:3, flexShrink:0, cursor:"grab" }}>⠿</span>
-      {/* Status buttons */}
       <div style={{ display:"flex", gap:4, flexShrink:0, paddingTop:2 }}>
         <button onClick={e=>{ e.stopPropagation(); onSetStatus(period, goal.id, isDone?"pending":"done"); }}
           title="Выполнено"
@@ -1871,7 +1569,6 @@ function GoalItem({ goal, period, onDelete, onSetStatus, onUpdateText, dragHandl
           {isFail && <span style={{ color:"#fff", fontSize:11, fontWeight:700 }}>✕</span>}
         </button>
       </div>
-      {/* Text */}
       <div style={{ flex:1, minWidth:0 }}>
         {editing ? (
           <input autoFocus value={val} onChange={e=>setVal(e.target.value)}
@@ -1996,7 +1693,6 @@ function MonthGoalsCard({ monthIdx, year, goals, lang, onAdd, onDelete, onSetSta
     );
   }
 
-  // Full card for single month view
   return (
     <div className="gl-card month-card" style={{ borderColor: color + "45" }}>
       {monthGoals.length > 0 && <div className="gl-badge">{monthGoals.length}</div>}
@@ -2039,11 +1735,9 @@ function MonthGoalsCard({ monthIdx, year, goals, lang, onAdd, onDelete, onSetSta
 function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onDelete, onSetStatus, onUpdateText, onReorder }) {
   const now = new Date();
   const year = now.getFullYear();
-  const curMonth = now.getMonth(); // 0-indexed
+  const curMonth = now.getMonth();
 
   const isYearView = goalsPeriod === "year";
-
-  // Year goals period key
   const yearKey = String(year);
   const yearGoals = goals[yearKey] || [];
   const [addingYear, setAddingYear] = useState(false);
@@ -2057,7 +1751,6 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
 
   return (
     <div>
-      {/* Toggle: Месяц / Год */}
       <div style={{ display:"flex", gap:3, marginBottom:24, background:"rgba(255,255,255,0.35)", borderRadius:20, padding:3, width:"fit-content", backdropFilter:"none" }}>
         <button onClick={()=>setGoalsPeriod("month")}
           style={{ padding:"5px 18px", borderRadius:18, border:"none", cursor:"pointer", fontSize:12, fontWeight:500, fontFamily:"inherit", background:!isYearView?"rgba(255,255,255,0.9)":"transparent", color:!isYearView?THEME.text:THEME.textLight, transition:"all 0.2s" }}>
@@ -2069,7 +1762,6 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
         </button>
       </div>
 
-      {/* МЕСЯЦ — полный вид текущего месяца */}
       {!isYearView && (
         <MonthGoalsCard
           monthIdx={curMonth} year={year} goals={goals} lang={lang}
@@ -2077,10 +1769,8 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
         />
       )}
 
-      {/* ГОД — сетка 12 месяцев + общие цели года */}
       {isYearView && (
         <div>
-          {/* Цели года */}
           <div className="gl-card" style={{ marginBottom:24, borderColor:"rgba(255,176,124,0.3)" }}>
             <div className="gl-card-head">
               <span style={{ fontSize:22 }}>🏆</span>
@@ -2120,7 +1810,6 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
             )}
           </div>
 
-          {/* Сетка 12 месяцев v17 */}
           <div className="gl-mgrid">
             {Array.from({length:12},(_,i)=>i).map(m => (
               <MonthGoalsCard key={m}
@@ -2136,18 +1825,16 @@ function GoalsPanel({ mode, goalsPeriod, setGoalsPeriod, goals, lang, onAdd, onD
   );
 }
 
-// ── Today Dropdown Button (portal-based to avoid clipping) ──────────
+// ── Today Dropdown Button ────────────────────────────────────────────
 function TodayDropButton({ tab, todayMode, lang, L, showTodayDrop, setShowTodayDrop, setTab, setTodayMode, setGoalsPeriod, tabStyle }) {
   const btnRef = useRef(null);
   const [rect, setRect] = useState(null);
 
   const handleClick = () => {
     if (tab !== "today") {
-      // First click — just switch to today tab, no dropdown
       setTab("today");
       setShowTodayDrop(false);
     } else {
-      // Already on today — toggle dropdown
       if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
       setShowTodayDrop(d => !d);
     }
@@ -2164,7 +1851,6 @@ function TodayDropButton({ tab, todayMode, lang, L, showTodayDrop, setShowTodayD
       </button>
       {showTodayDrop && rect && createPortal(
         <>
-          {/* Прозрачный оверлей — клик вне закрывает */}
           <div
             style={{ position:"fixed", inset:0, zIndex:9998 }}
             onClick={() => setShowTodayDrop(false)}
@@ -2209,7 +1895,6 @@ function TodayDropButton({ tab, todayMode, lang, L, showTodayDrop, setShowTodayD
   );
 }
 
-// Small inline button to add event from calendar
 function CalAddEventBtn({ date, lang, onAdd }) {
   const [show, setShow] = useState(false);
   return (
@@ -2264,7 +1949,6 @@ function EventModal({ event, onSave, onClose, lang }) {
           </div>
           <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder={lang==="ru"?"Описание (необязательно)":"Description (optional)"} rows={2}
             style={{ ...inp, resize:"none", lineHeight:1.5 }}/>
-          {/* Urgency */}
           <div>
             <div style={{ fontSize:11, color:THEME.textLight, marginBottom:8, letterSpacing:0.5, textTransform:"uppercase" }}>{lang==="ru"?"Важность":"Priority"}</div>
             <div style={{ display:"flex", gap:6 }}>
@@ -2298,8 +1982,6 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
   const [editEvent, setEditEvent]     = useState(null);
   const [initDate, setInitDate]       = useState(null);
 
-  // Sort: future & today first by date+time, then past
-  const now = new Date();
   const todayStr = TODAY;
 
   const sorted = [...(events || [])]
@@ -2331,7 +2013,6 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
 
   return (
     <div style={{ width:260, flexShrink:0, position:"sticky", top:80, alignSelf:"flex-start", maxHeight:"calc(100vh - 110px)", display:"flex", flexDirection:"column" }}>
-      {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
         <span style={{ fontSize:13, fontWeight:600, color:THEME.text }}>
           {lang==="ru"?"📅 Предстоящие":"📅 Upcoming"}
@@ -2342,7 +2023,6 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
         </button>
       </div>
 
-      {/* Events list */}
       <div style={{ overflowY:"auto", display:"flex", flexDirection:"column", gap:8, paddingRight:4 }}>
         {sorted.length === 0 && (
           <div style={{ background:"rgba(255,255,255,0.45)", borderRadius:14, padding:"20px 16px", textAlign:"center", border:"1px solid rgba(255,255,255,0.7)" }}>
@@ -2364,9 +2044,7 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
               onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.1)"; }}
               onMouseLeave={e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}
               onClick={() => openEdit(evt)}>
-              {/* Urgency dot */}
               <div style={{ position:"absolute", top:11, right:11, width:7, height:7, borderRadius:"50%", background:urg.dot }}/>
-              {/* Days badge */}
               {(isToday || isTomorrow || isUrgentSoon) && (
                 <div style={{ display:"inline-block", fontSize:9, fontWeight:700, letterSpacing:0.5, color:urg.dot, background:"rgba(255,255,255,0.6)", borderRadius:6, padding:"1px 6px", marginBottom:5, textTransform:"uppercase" }}>
                   {isToday ? (lang==="ru"?"Сегодня!":"Today!") : isTomorrow ? (lang==="ru"?"Завтра":"Tomorrow") : `${days}д`}
@@ -2375,7 +2053,6 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
               <div style={{ fontSize:13, fontWeight:600, color:THEME.text, marginBottom:3, paddingRight:14, lineHeight:1.3 }}>{evt.title}</div>
               <div style={{ fontSize:11, color:THEME.textLight }}>{formatEvtDate(evt.date, evt.time)}</div>
               {evt.desc && <div style={{ fontSize:11, color:THEME.textLight, marginTop:4, lineHeight:1.4, opacity:0.8 }}>{evt.desc}</div>}
-              {/* Delete */}
               <button onClick={e=>{ e.stopPropagation(); onDelete(evt.id); }}
                 style={{ position:"absolute", bottom:8, right:10, border:"none", background:"transparent", color:"rgba(150,150,150,0.6)", cursor:"pointer", fontSize:14, padding:0, lineHeight:1 }}>×</button>
             </div>
@@ -2383,7 +2060,6 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
         })}
       </div>
 
-      {/* Modal */}
       {showModal && (
         <EventModal
           event={editEvent}
@@ -2400,49 +2076,10 @@ function EventsPanel({ events, lang, onAdd, onDelete, onUpdate }) {
   );
 }
 
-// ── Helper: deduplicate array by id ──────────────────────────────────
-function dedupeById(arr) {
-  const seen = new Set();
-  return arr.filter(x => { if (!x?.id || seen.has(x.id)) return false; seen.add(x.id); return true; });
-}
-
-// ── Apply new-day routine logic to any appData object ───────────────
-function applyNewDay(data, today) {
-  const td = today || getLocalToday();
-  const last = data.lastDate;
-  const todayData = data.days[td];
-  const todayBlocks = todayData?.blocks || [];
-  const todayHasRoutines = todayBlocks.some(b => b.tasks?.some(t => t.routine));
-  const todayHasRealTasks = todayBlocks.some(b => b.tasks?.some(t => !t.routine));
-
-  if (!last || last === td) {
-    if (!todayData) {
-      return { ...data, days: { ...data.days, [td]: { blocks: DEFAULT_BLOCKS() } }, lastDate: td };
-    }
-    return { ...data, lastDate: td };
-  }
-
-  const routineSource = findRoutineSource(data.days, td) || DEFAULT_BLOCKS();
-  const routineBlocks = buildNewDay(routineSource, td);
-
-  if (!todayData) {
-    return { ...data, days: { ...data.days, [td]: { blocks: routineBlocks } }, lastDate: td };
-  }
-  if (todayHasRealTasks) {
-    return { ...data, lastDate: td };
-  }
-  if (!todayHasRoutines && routineBlocks.length > 0) {
-    const existingIds = new Set(todayBlocks.map(b => b.id));
-    const toAdd = routineBlocks.filter(b => !existingIds.has(b.id));
-    return { ...data, days: { ...data.days, [td]: { blocks: [...todayBlocks, ...toAdd] } }, lastDate: td };
-  }
-  return { ...data, lastDate: td };
-}
-
 // ── Pomodoro Timer ───────────────────────────────────────────────────
 function PomodoroTimer({ lang }) {
   const WORK_MIN = 25, BREAK_MIN = 5;
-  const [phase, setPhase]       = useState("work"); // "work" | "break"
+  const [phase, setPhase]       = useState("work");
   const [seconds, setSeconds]   = useState(WORK_MIN * 60);
   const [running, setRunning]   = useState(false);
   const [open, setOpen]         = useState(false);
@@ -2498,7 +2135,6 @@ function PomodoroTimer({ lang }) {
     setSeconds(WORK_MIN * 60);
   };
 
-  // ── Compact widget (always visible) ──
   const widget = (
     <div style={{
       position: "fixed", bottom: 88, right: 24, zIndex: 7980,
@@ -2510,7 +2146,6 @@ function PomodoroTimer({ lang }) {
       minWidth: 148,
       userSelect: "none",
     }}>
-      {/* Phase indicator dot */}
       <div style={{
         width: 8, height: 8, borderRadius: "50%",
         background: accent,
@@ -2530,9 +2165,7 @@ function PomodoroTimer({ lang }) {
           {mm}:{ss}
         </div>
       </div>
-      {/* Controls */}
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {/* Play/Pause */}
         <button onClick={() => setRunning(r => !r)} title={running ? "Пауза" : "Старт"}
           style={{
             width: 32, height: 32, borderRadius: "50%", border: "none",
@@ -2545,7 +2178,6 @@ function PomodoroTimer({ lang }) {
           }}>
           {running ? "⏸" : "▶"}
         </button>
-        {/* Reset */}
         <button onClick={reset} title="Сброс"
           style={{
             width: 28, height: 28, borderRadius: "50%", border: "1px solid #E8EEF4",
@@ -2559,7 +2191,6 @@ function PomodoroTimer({ lang }) {
     </div>
   );
 
-  // ── Floating 🍅 button ──
   const floatBtn = (
     <button onClick={() => setOpen(o => !o)}
       style={{
@@ -2579,7 +2210,6 @@ function PomodoroTimer({ lang }) {
     </button>
   );
 
-  // ── Expanded panel (opens above widget) ──
   const expandedPanel = open && createPortal(
     <>
       <div style={{ position: "fixed", inset: 0, zIndex: 7990 }} onClick={() => setOpen(false)}/>
@@ -2592,7 +2222,6 @@ function PomodoroTimer({ lang }) {
         padding: "18px 20px",
         minWidth: 220,
       }} onClick={e => e.stopPropagation()}>
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#2D4A6B" }}>
             {lang === "ru" ? "Помодоро" : "Pomodoro"}
@@ -2602,7 +2231,6 @@ function PomodoroTimer({ lang }) {
           </span>
         </div>
 
-        {/* Ring timer */}
         {(() => {
           const r = 54, cx = 70, cy = 70;
           const circ = 2 * Math.PI * r;
@@ -2622,7 +2250,6 @@ function PomodoroTimer({ lang }) {
           );
         })()}
 
-        {/* Phase dots */}
         <div style={{ display: "flex", gap: 6, margin: "10px 0 0", justifyContent: "center" }}>
           {["work", "break"].map(p => (
             <div key={p} style={{
@@ -2633,7 +2260,6 @@ function PomodoroTimer({ lang }) {
           ))}
         </div>
 
-        {/* Controls */}
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
           <button onClick={() => setRunning(r => !r)}
             style={{
@@ -2675,218 +2301,312 @@ function PomodoroTimer({ lang }) {
 }
 
 // ── Main App ────────────────────────────────────────────────────────
-// Мой Планер v16.1
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser]           = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-
-  // Check auth session on mount
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      window.__currentUserId__ = session?.user?.id ?? null;
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      window.__currentUserId__ = session?.user?.id ?? null;
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-  const [lang, setLang] = useState("ru");
-  const [appData, setAppData] = useState(loadAppData);
-  const [tab, setTab] = useState("today");
-  const [todayMode, setTodayMode] = useState("day"); // "day" | "month" | "year"
-  const [goalsPeriod, setGoalsPeriod] = useState("month"); // for goals view: "month" | "year"
+  const [appData, setAppData]     = useState(loadAppData);
+  const [lang, setLang]           = useState("ru");
+  const [tab, setTab]             = useState("today");
+  const [todayMode, setTodayMode] = useState("day");
+  const [goalsPeriod, setGoalsPeriod] = useState("month");
   const [showTodayDrop, setShowTodayDrop] = useState(false);
   const [habitPeriod, setHabitPeriod] = useState("week");
-  const [selectedDay, setSelectedDay] = useState(TODAY);
-  const [showNewDayModal, setShowNewDayModal] = useState(false);
-  const [calView, setCalView] = useState("mini"); // "mini" | "grid"
+  const [selectedDay, setSelectedDay] = useState(getLocalToday);
+  const [calView, setCalView]     = useState("mini");
+  const [syncing, setSyncing]     = useState(false);
+  const [lastSync, setLastSync]   = useState(null);
+  const [isOnline, setIsOnline]   = useState(navigator.onLine);
+
+  const userRef               = useRef(null);
+  const unsubscribeRealtimeRef = useRef(null);
+  // Флаг: не обрабатывать Realtime INSERT пока сам не записали (debounce 3s)
+  const realtimeIgnoreUntil   = useRef(0);
 
   const L = LANG[lang];
 
-  // Cloud sync state
-  const [syncing, setSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [offlinePending, setOfflinePending] = useState(false);
-  const saveTimer = useRef(null);
-  const isFirstLoad = useRef(true);
-  const userRef = useRef(null);
-  const localSaveTime = useRef(null);
-  const latestData = useRef(null);
-
-  // Keep latestData ref current for async closures
-  useEffect(() => { latestData.current = appData; }, [appData]);
+  // ── Auth ────────────────────────────────────────────────────────
   useEffect(() => {
-    userRef.current = user;
-    if (user) {
-      // Reset first load flag so sync runs fresh for this user
-      isFirstLoad.current = true;
-    }
-  }, [user]);
-
-  // Track online/offline
-  useEffect(() => {
-    const goOnline = async () => {
-      setIsOnline(true);
-      setOfflinePending(false);
-      await flushOfflineQueue();
-      // Re-save latest data now that we're back online
-      if (latestData.current && !isFirstLoad.current) {
-        const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
-        await saveToCloud(userRef.current?.id, toSave);
-        setLastSync(new Date());
-      }
-    };
-    const goOffline = () => { setIsOnline(false); };
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      userRef.current = session?.user ?? null;
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+      userRef.current = session?.user ?? null;
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Save on tab close/refresh — catches unsaved changes
+  // ── Online/offline ───────────────────────────────────────────────
   useEffect(() => {
-    const handleUnload = () => {
-      if (latestData.current && !isFirstLoad.current && navigator.onLine) {
-        const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
-        // Use sendBeacon for reliable delivery on page close
-        const body = JSON.stringify([{ id: "main", data: toSave, updated_at: new Date().toISOString() }]);
-        navigator.sendBeacon
-          ? navigator.sendBeacon(SUPABASE_URL + "/rest/v1/planner_data?id=eq.main", new Blob([body], { type: "application/json" }))
-          : saveToCloud(user?.id, toSave).catch(() => {});
-      }
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
+    const on  = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online",  on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
-  // Save to localStorage immediately; debounce cloud save 1s
+  // ── Load all data on login ───────────────────────────────────────
   useEffect(() => {
-    localStorage.setItem("dailyplanner_v3", JSON.stringify(appData));
-    if (isFirstLoad.current) return;
-    localSaveTime.current = new Date();
-    window.__hasLocalChanges__ = true;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      const toSave = { ...latestData.current, days: compressOldDays(latestData.current.days) };
-      if (navigator.onLine) {
-        setSyncing(true);
-        await saveToCloud(userRef.current?.id, toSave);
-        window.__hasLocalChanges__ = false;
-        window.__lastLocalSave__ = new Date();
-        setSyncing(false);
-        setLastSync(new Date());
-        setOfflinePending(false);
-      } else {
-        enqueueOfflineSave(toSave);
-        setOfflinePending(true);
-      }
-    }, 1000);
-  }, [appData]);
+    if (!user) return;
 
-  // On mount: load from cloud, merge intelligently — runs once
-  useEffect(() => {
+    let cancelled = false;
     (async () => {
       setSyncing(true);
-      if (navigator.onLine) await flushOfflineQueue();
-      const cloudData = navigator.onLine ? await loadFromCloud(userRef.current?.id) : null;
-      const today = getLocalToday();
+      const today   = getLocalToday();
+      const dateFrom = localDateStr(new Date(Date.now() - 90 * 86400000));
+      const dateTo   = localDateStr(new Date(Date.now() + 30 * 86400000));
 
-      // Compute new state based on cloud + local, then set directly
-      setAppData(local => {
-        if (!cloudData || !cloudData.lastDate) {
-          return applyNewDay(local, today);
+      const [blocksRows, tasksRows, habitsRows, habitLogRows, goalsRows, eventsRows, settingsRow] =
+        await Promise.all([
+          db.fetchBlocks(user.id),
+          db.fetchTasks(user.id, dateFrom, dateTo),
+          db.fetchHabits(user.id),
+          db.fetchHabitLog(user.id, dateFrom, today),
+          db.fetchGoals(user.id),
+          db.fetchEvents(user.id),
+          db.fetchSettings(user.id),
+        ]);
+
+      if (cancelled) return;
+
+      // Есть хоть какие-то данные в облаке?
+      const hasAnyCloudData =
+        (blocksRows?.length  > 0) || (tasksRows?.length   > 0) ||
+        (habitsRows?.length  > 0) || (habitLogRows?.length > 0) ||
+        (goalsRows?.length   > 0) || (eventsRows?.length   > 0);
+
+      if (hasAnyCloudData) {
+        const cloudDays = db.buildDaysFromDB(blocksRows || [], tasksRows || []);
+
+        // Если блоки есть но на сегодня задач нет — подставляем скелет
+        // чтобы applyNewDay мог перенести рутины
+        if (!cloudDays[today] && blocksRows?.length > 0) {
+          cloudDays[today] = { blocks: db.buildBlockSkeletonsFromDB(blocksRows) };
         }
 
-        // With auth — cloud is always source of truth on load.
-        // Only keep local today's tasks if they are strictly newer
-        // (user made changes after last cloud save on this device)
-        const localTodayBlocks = local.days[today]?.blocks || [];
-        const cloudTodayBlocks = cloudData.days?.[today]?.blocks || [];
-        const countReal = blocks => blocks.flatMap(b => b.tasks||[]).filter(t=>!t.routine).length;
-        const localCount = countReal(localTodayBlocks);
-        const cloudCount = countReal(cloudTodayBlocks);
+        setAppData(local => applyNewDay({
+          ...local,
+          days:     { ...local.days, ...cloudDays },
+          habits:   db.buildHabitsFromDB(habitsRows || []),
+          habitLog: db.buildHabitLogFromDB(habitLogRows || []),
+          goals:    db.buildGoalsFromDB(goalsRows || []),
+          events:   db.buildEventsFromDB(eventsRows || []),
+          lastDate: today,
+        }, today));
+      } else {
+        setAppData(local => applyNewDay(local, today));
+      }
 
-        // Cloud wins for everything except today if local has more real work
-        const localHasMoreWork = localCount > cloudCount && window.__hadSavedData__;
-
-        const base = {
-          ...cloudData,
-          version: Math.max(local.version||0, cloudData.version||0, DATA_VERSION),
-          goals: { ...(cloudData.goals||{}), ...(local.goals||{}) },
-          events: dedupeById([...(cloudData.events||[]), ...(local.events||[])]),
-          habitLog: { ...(cloudData.habitLog||{}), ...(local.habitLog||{}) },
-          days: {
-            ...cloudData.days,
-            [today]: localHasMoreWork
-              ? local.days[today]
-              : (cloudData.days?.[today] || local.days[today])
-          }
-        };
-
-        return applyNewDay(base, today);
-      });
+      // Язык из настроек — без перезаписи обратно в БД
+      if (settingsRow?.lang) {
+        isLangFromDB.current = true;
+        setLang(settingsRow.lang);
+      }
 
       setSyncing(false);
       setLastSync(new Date());
-      setTimeout(() => {
-        isFirstLoad.current = false;
-      }, 1500);
-    })();
-  }, [user]); // re-run when user logs in
 
-  // Poll every 30s — pull changes from other devices
-  useEffect(() => {
-    const id = setInterval(async () => {
-      if (isFirstLoad.current || !navigator.onLine || document.hidden) return;
-      // Don't poll if we just saved (avoid overwriting our own save)
-      if (window.__hasLocalChanges__) return;
-      try {
-        if (!userRef.current?.id) return;
-        const { data: rows, error } = await supabase
-          .from("user_data")
-          .select("data, updated_at")
-          .eq("user_id", userRef.current.id)
-          .single();
-        if (error || !rows) return;
-        const cloudUpdated = new Date(rows.updated_at);
-        const localSaved = localSaveTime.current || new Date(0);
-        if (cloudUpdated <= localSaved) return;
-        const cloudData = rows.data;
-        if (!cloudData) return;
-        const today = getLocalToday();
-        setAppData(d => {
-          // Merge cloud into local — cloud wins for history, local wins for today if has work
-          const localToday = d.days[today];
-          const cloudToday = cloudData.days?.[today];
-          const localRealTasks = localToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
-          const cloudRealTasks = cloudToday?.blocks?.flatMap(b=>b.tasks||[]).filter(t=>!t.routine).length || 0;
-          const merged = {
-            ...cloudData,
-            version: Math.max(d.version||0, cloudData.version||0, DATA_VERSION),
-            goals: { ...(cloudData.goals||{}), ...(d.goals||{}) },
-            events: dedupeById([...(cloudData.events||[]), ...(d.events||[])]),
-            habitLog: { ...(cloudData.habitLog||{}), ...(d.habitLog||{}) },
-            days: {
-              ...cloudData.days,
-              [today]: localRealTasks >= cloudRealTasks ? localToday : cloudToday
+      // ── Realtime подписки ──────────────────────────────────────
+      if (unsubscribeRealtimeRef.current) unsubscribeRealtimeRef.current();
+
+      // Помощник: игнорировать ли Realtime INSERT (это наш собственный write)
+      const isOwnWrite = () => Date.now() < realtimeIgnoreUntil.current;
+
+      unsubscribeRealtimeRef.current = subscribeToUserData(user.id, {
+
+        // BLOCKS
+        onBlocksChange: ({ eventType, new: row, old: oldRow }) => {
+          setAppData(d => {
+            const days = { ...d.days };
+            if (eventType === "DELETE") {
+              Object.keys(days).forEach(date => {
+                days[date] = { ...days[date],
+                  blocks: (days[date]?.blocks || []).filter(b => b.id !== oldRow.id) };
+              });
+            } else if (eventType === "INSERT") {
+              // Пришёл INSERT — если это наш optimistic update, блок уже в стейте
+              const t = getLocalToday();
+              const exists = (days[t]?.blocks || []).some(b => b.id === row.id);
+              if (!exists && !isOwnWrite()) {
+                // Другое устройство добавило блок
+                const newBlock = {
+                  id: row.id, colorId: row.color_id,
+                  names: { ru: row.name_ru, en: row.name_en },
+                  pinned: row.pinned, position: row.position, tasks: [],
+                };
+                days[t] = { ...days[t],
+                  blocks: [...(days[t]?.blocks || []), newBlock]
+                    .sort((a, b) => a.position - b.position) };
+              }
+            } else {
+              // UPDATE — обновляем во всех днях
+              Object.keys(days).forEach(date => {
+                days[date] = { ...days[date],
+                  blocks: (days[date]?.blocks || []).map(b => b.id === row.id
+                    ? { ...b, colorId: row.color_id,
+                        names: { ru: row.name_ru, en: row.name_en },
+                        pinned: row.pinned, position: row.position }
+                    : b) };
+              });
             }
-          };
-          return merged;
-        });
-        localSaveTime.current = cloudUpdated; // update to match cloud
-        setLastSync(new Date());
-      } catch {}
-    }, 30000);
-    return () => clearInterval(id);
-  }, []); // stable — never recreates
+            return { ...d, days };
+          });
+        },
 
-  // Re-check date every minute (tab open overnight)
+        // TASKS
+        onTasksChange: ({ eventType, new: row, old: oldRow }) => {
+          setAppData(d => {
+            const days = { ...d.days };
+            if (eventType === "DELETE") {
+              Object.keys(days).forEach(date => {
+                days[date] = { ...days[date],
+                  blocks: (days[date]?.blocks || []).map(b => ({
+                    ...b, tasks: b.tasks.filter(t => t.id !== oldRow.id) })) };
+              });
+            } else {
+              const date = row.date;
+              const existing = days[date] || { blocks: [] };
+              let blocks = existing.blocks;
+
+              // Ищем блок в этом дне; если нет — берём из другого дня
+              if (!blocks.some(b => b.id === row.block_id)) {
+                let meta = null;
+                for (const dd of Object.values(days)) {
+                  meta = (dd?.blocks || []).find(b => b.id === row.block_id);
+                  if (meta) break;
+                }
+                if (!meta && !isOwnWrite()) {
+                  // Блок пришёл с другого устройства — создаём заглушку
+                  meta = { id: row.block_id, colorId: "amber",
+                    names: { ru: "Блок", en: "Block" },
+                    pinned: false, position: blocks.length };
+                }
+                if (meta) blocks = [...blocks, { ...meta, tasks: [] }];
+              }
+
+              const taskData = {
+                id: row.id,
+                names: { ru: row.name_ru, en: row.name_en },
+                status: row.status, type: row.type,
+                routine: row.routine,
+                routineLabel: row.routine_label,
+                routineDays: row.routine_days,
+                position: row.position,
+              };
+
+              blocks = blocks.map(b => {
+                if (b.id !== row.block_id) return b;
+                const exists = b.tasks.some(t => t.id === row.id);
+                if (eventType === "INSERT") {
+                  // Задача уже есть (optimistic) — не дублируем
+                  return exists ? b : { ...b, tasks: [...b.tasks, taskData] };
+                }
+                // UPDATE
+                return { ...b, tasks: exists
+                  ? b.tasks.map(t => t.id === row.id ? taskData : t)
+                  : b.tasks };
+              });
+
+              days[date] = { ...existing, blocks };
+            }
+            return { ...d, days };
+          });
+        },
+
+        // HABITS
+        onHabitsChange: ({ eventType, new: row, old: oldRow }) => {
+          setAppData(d => {
+            let habits = d.habits || [];
+            if (eventType === "DELETE") {
+              habits = habits.filter(h => h.id !== oldRow.id);
+            } else if (eventType === "INSERT") {
+              if (!habits.some(h => h.id === row.id)) {
+                habits = [...habits, {
+                  id: row.id, names: { ru: row.name_ru, en: row.name_en },
+                  color: row.color, position: row.position }];
+              }
+            } else {
+              habits = habits.map(h => h.id === row.id
+                ? { ...h, names: { ru: row.name_ru, en: row.name_en },
+                    color: row.color, position: row.position }
+                : h);
+            }
+            return { ...d, habits };
+          });
+        },
+
+        // HABIT LOG
+        onHabitLogChange: ({ new: row }) => {
+          if (!row) return;
+          setAppData(d => {
+            const habitLog = { ...d.habitLog, [row.date]: {
+              ...(d.habitLog[row.date] || {}), [row.habit_id]: row.done } };
+            return { ...d, habitLog };
+          });
+        },
+
+        // GOALS
+        onGoalsChange: ({ eventType, new: row, old: oldRow }) => {
+          setAppData(d => {
+            const goals = { ...d.goals };
+            if (eventType === "DELETE") {
+              Object.keys(goals).forEach(p => {
+                goals[p] = goals[p].filter(g => g.id !== oldRow.id);
+              });
+            } else if (eventType === "INSERT") {
+              const list = goals[row.period] || [];
+              if (!list.some(g => g.id === row.id)) {
+                goals[row.period] = [...list,
+                  { id: row.id, text: row.text, status: row.status, position: row.position }];
+              }
+            } else {
+              if (goals[row.period]) {
+                goals[row.period] = goals[row.period].map(g => g.id === row.id
+                  ? { ...g, text: row.text, status: row.status, position: row.position } : g);
+              }
+            }
+            return { ...d, goals };
+          });
+        },
+
+        // EVENTS
+        onEventsChange: ({ eventType, new: row, old: oldRow }) => {
+          setAppData(d => {
+            let events = d.events || [];
+            if (eventType === "DELETE") {
+              events = events.filter(e => e.id !== oldRow.id);
+            } else if (eventType === "INSERT") {
+              if (!events.some(e => e.id === row.id)) {
+                events = [...events, {
+                  id: row.id, date: row.date, title: row.title,
+                  time: row.time, desc: row.description, urgency: row.urgency }];
+              }
+            } else {
+              events = events.map(e => e.id === row.id
+                ? { ...e, date: row.date, title: row.title,
+                    time: row.time, desc: row.description, urgency: row.urgency }
+                : e);
+            }
+            return { ...d, events };
+          });
+        },
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribeRealtimeRef.current) unsubscribeRealtimeRef.current();
+    };
+  }, [user]);
+
+  // ── localStorage persistence ─────────────────────────────────────
+  useEffect(() => {
+    localStorage.setItem("dailyplanner_v3", JSON.stringify(appData));
+  }, [appData]);
+
+  // ── Date rollover every minute ───────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => {
       const today = getLocalToday();
@@ -2895,136 +2615,300 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  // Startup: apply new-day to local before cloud loads
+  // ── Apply new-day on startup ─────────────────────────────────────
   useEffect(() => {
     setAppData(d => applyNewDay(d, getLocalToday()));
   }, []);
 
+  // ── Sync lang → DB (only when user changes it, not on load) ─────
+  const isLangFromDB = useRef(false);
+  useEffect(() => {
+    if (isLangFromDB.current) { isLangFromDB.current = false; return; }
+    if (userRef.current?.id) db.saveSettings(userRef.current.id, lang);
+  }, [lang]);
+
+  // ── updateDay helper ─────────────────────────────────────────────
   const updateDay = useCallback((dateKey, updater) => {
-    setAppData(d => ({ ...d, days: { ...d.days, [dateKey]: { ...d.days[dateKey], blocks: updater(d.days[dateKey]?.blocks || []) } } }));
+    setAppData(d => ({
+      ...d,
+      days: { ...d.days, [dateKey]: {
+        ...d.days[dateKey],
+        blocks: updater(d.days[dateKey]?.blocks || []) } }
+    }));
   }, []);
 
-  const [previewBlocks, setPreviewBlocks] = useState(null); // future day preview — NOT saved
+  // ── markOwnWrite: ставим флаг "игнорировать RT INSERT" на 3 сек ──
+  const markOwnWrite = useCallback(() => {
+    realtimeIgnoreUntil.current = Date.now() + 3000;
+  }, []);
+
+  const [previewBlocks, setPreviewBlocks] = useState(null);
 
   const handleSelectDay = useCallback((day) => {
     setSelectedDay(day);
     const today = getLocalToday();
     if (day > today) {
       const sourceBlocks = appData.days[today]?.blocks || [];
-      const preview = buildNewDay(sourceBlocks, day);
-      setPreviewBlocks(preview);
+      setPreviewBlocks(buildNewDay(sourceBlocks, day));
     } else {
       setPreviewBlocks(null);
     }
   }, [appData]);
 
-  // currentBlocks: for future days show preview, for others show saved data
-  const today = getLocalToday();
-  const isToday = selectedDay === today;
-  const isFuture = selectedDay > today;
-  const isPast = selectedDay < today;
-  const isEditable = isToday || isFuture;
+  const today          = getLocalToday();
+  const isToday        = selectedDay === today;
+  const isFuture       = selectedDay > today;
+  const isPast         = selectedDay < today;
+  const isEditable     = isToday || isFuture;
   const isStatusEditable = isPast;
-  const currentBlocks = isFuture
+  const currentBlocks  = isFuture
     ? (previewBlocks ?? appData.days[selectedDay]?.blocks ?? [])
     : (appData.days[selectedDay]?.blocks || []);
 
-  const hUpdateBlock   = useCallback((bid, patch) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, ...patch } : b)), [selectedDay, updateDay]);
-  const hDeleteBlock   = useCallback((bid) => updateDay(selectedDay, blocks => blocks.filter(b => b.id !== bid)), [selectedDay, updateDay]);
-  const hAddTask       = useCallback((bid, task) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: [...b.tasks, task] } : b)), [selectedDay, updateDay]);
-  const hDeleteTask    = useCallback((bid, tid) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.filter(t => t.id !== tid) } : b)), [selectedDay, updateDay]);
-  const hSetStatus     = useCallback((bid, tid, status) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, status } : t) } : b)), [selectedDay, updateDay]);
-  const hUpdateName    = useCallback((bid, tid, name) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, names: { ...t.names, [lang]: name } } : t) } : b)), [selectedDay, lang, updateDay]);
-  const hToggleRoutine = useCallback((bid, tid) => {
-    updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, routine: !t.routine } : t) } : b));
-    // Clean up future days so they get fresh routines when arrived
-    setAppData(d => {
-      const futureDays = Object.keys(d.days).filter(k => k > TODAY);
-      const cleaned = {};
-      futureDays.forEach(k => { cleaned[k] = { blocks: [] }; });
-      return { ...d, days: { ...d.days, ...cleaned } };
-    });
-  }, [selectedDay, updateDay]);
-
-  const hUpdateRoutineLabel = useCallback((bid, tid, label) => updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, routineLabel: label } : t) } : b)), [selectedDay, updateDay]);
-
-  const hUpdateRoutineDays = useCallback((bid, tid, days) => {
-    updateDay(selectedDay, blocks => blocks.map(b => b.id === bid ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, routineDays: days } : t) } : b));
-    // Clean up future days so they get updated routine schedule
-    setAppData(d => {
-      const futureDays = Object.keys(d.days).filter(k => k > TODAY);
-      const cleaned = {};
-      futureDays.forEach(k => { cleaned[k] = { blocks: [] }; });
-      return { ...d, days: { ...d.days, ...cleaned } };
-    });
-  }, [selectedDay, updateDay]);
-  const hUpdateBacklog = useCallback((updates) => setAppData(d => ({ ...d, backlog: { ...d.backlog, ...updates } })), []);
-  const hReorder = useCallback((newBlocks) => updateDay(selectedDay, () => newBlocks), [selectedDay, updateDay]);
-
-  // Goals helpers
-  const getGoals = useCallback((period) => {
-    // period: "YYYY-MM" for month or "YYYY" for year
-    return appData.goals?.[period] || [];
-  }, [appData.goals]);
-
-  const hAddGoal = useCallback((period, text) => {
-    setAppData(d => ({
-      ...d,
-      goals: {
-        ...d.goals,
-        [period]: [...(d.goals?.[period] || []), { id: uid(), text, status: "pending" }]
+  // ── BLOCK HANDLERS ───────────────────────────────────────────────
+  const hUpdateBlock = useCallback((bid, patch) => {
+    const dateKey = getLocalToday(); // всегда сегодня для блоков
+    markOwnWrite();
+    updateDay(dateKey, blocks => {
+      if (bid === "__add__") {
+        const newBlock = { ...patch, tasks: [] };
+        db.upsertBlock(db.blockToRow(newBlock, userRef.current?.id, blocks.length));
+        return [...blocks, newBlock];
       }
-    }));
+      const updated = blocks.map(b => b.id === bid ? { ...b, ...patch } : b);
+      const idx = updated.findIndex(b => b.id === bid);
+      if (idx !== -1) db.upsertBlock(db.blockToRow(updated[idx], userRef.current?.id, idx));
+      return updated;
+    });
+  }, [updateDay, markOwnWrite]);
+
+  const hDeleteBlock = useCallback((bid) => {
+    // Удаляем блок из всех дней в стейте
+    setAppData(d => {
+      const days = { ...d.days };
+      Object.keys(days).forEach(date => {
+        const filtered = (days[date]?.blocks || []).filter(b => b.id !== bid);
+        days[date] = { ...days[date], blocks: filtered };
+      });
+      return { ...d, days };
+    });
+    // Удаляем блок и его задачи из БД
+    db.deleteBlock(bid);
+    db.deleteTasksByBlock(bid);
   }, []);
+
+  // ── TASK HANDLERS ────────────────────────────────────────────────
+  const hAddTask = useCallback((bid, task) => {
+    markOwnWrite();
+    updateDay(selectedDay, blocks => {
+      const updated = blocks.map(b => b.id === bid
+        ? { ...b, tasks: [...b.tasks, task] } : b);
+      const block = updated.find(b => b.id === bid);
+      const position = block ? block.tasks.length - 1 : 0;
+      db.upsertTask(db.taskToRow(task, bid, selectedDay, userRef.current?.id, position));
+      return updated;
+    });
+  }, [selectedDay, updateDay, markOwnWrite]);
+
+  const hDeleteTask = useCallback((bid, tid) => {
+    updateDay(selectedDay, blocks =>
+      blocks.map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.filter(t => t.id !== tid) } : b));
+    db.deleteTask(tid);
+  }, [selectedDay, updateDay]);
+
+  const hSetStatus = useCallback((bid, tid, status) => {
+    updateDay(selectedDay, blocks => {
+      const updated = blocks.map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, status } : t) } : b);
+      const block = updated.find(b => b.id === bid);
+      const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
+      if (block && idx !== -1)
+        db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
+      return updated;
+    });
+  }, [selectedDay, updateDay]);
+
+  const hUpdateName = useCallback((bid, tid, name) => {
+    updateDay(selectedDay, blocks => {
+      const updated = blocks.map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.map(t => t.id === tid
+            ? { ...t, names: { ...t.names, [lang]: name } } : t) } : b);
+      const block = updated.find(b => b.id === bid);
+      const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
+      if (block && idx !== -1)
+        db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
+      return updated;
+    });
+  }, [selectedDay, lang, updateDay]);
+
+  const hToggleRoutine = useCallback((bid, tid) => {
+    // Один setAppData — объединяем оба обновления
+    setAppData(d => {
+      // 1. Обновляем задачу
+      const dateKey = selectedDay;
+      const dayBlocks = (d.days[dateKey]?.blocks || []).map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.map(t => t.id === tid
+            ? { ...t, routine: !t.routine } : t) } : b);
+      const block = dayBlocks.find(b => b.id === bid);
+      const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
+      if (block && idx !== -1)
+        db.upsertTask(db.taskToRow(block.tasks[idx], bid, dateKey, userRef.current?.id, idx));
+
+      // 2. Чистим будущие дни
+      const today = getLocalToday();
+      const newDays = { ...d.days, [dateKey]: { ...d.days[dateKey], blocks: dayBlocks } };
+      Object.keys(newDays).forEach(k => { if (k > today) newDays[k] = { blocks: [] }; });
+      return { ...d, days: newDays };
+    });
+  }, [selectedDay]);
+
+  const hUpdateRoutineLabel = useCallback((bid, tid, label) => {
+    updateDay(selectedDay, blocks => {
+      const updated = blocks.map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.map(t => t.id === tid
+            ? { ...t, routineLabel: label } : t) } : b);
+      const block = updated.find(b => b.id === bid);
+      const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
+      if (block && idx !== -1)
+        db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
+      return updated;
+    });
+  }, [selectedDay, updateDay]);
+
+  const hUpdateRoutineDays = useCallback((bid, tid, routineDays) => {
+    setAppData(d => {
+      const dateKey   = selectedDay;
+      const dayBlocks = (d.days[dateKey]?.blocks || []).map(b => b.id === bid
+        ? { ...b, tasks: b.tasks.map(t => t.id === tid
+            ? { ...t, routineDays } : t) } : b);
+      const block = dayBlocks.find(b => b.id === bid);
+      const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
+      if (block && idx !== -1)
+        db.upsertTask(db.taskToRow(block.tasks[idx], bid, dateKey, userRef.current?.id, idx));
+
+      const today = getLocalToday();
+      const newDays = { ...d.days, [dateKey]: { ...d.days[dateKey], blocks: dayBlocks } };
+      Object.keys(newDays).forEach(k => { if (k > today) newDays[k] = { blocks: [] }; });
+      return { ...d, days: newDays };
+    });
+  }, [selectedDay]);
+
+  const hUpdateBacklog = useCallback((updates) => {
+    setAppData(d => ({ ...d, backlog: { ...d.backlog, ...updates } }));
+  }, []);
+
+  const hReorder = useCallback((newBlocks) => {
+    updateDay(selectedDay, () => newBlocks);
+    // Последовательно обновляем позиции (не параллельно, чтобы не было гонки)
+    newBlocks.forEach((block, idx) => {
+      db.upsertBlock(db.blockToRow(block, userRef.current?.id, idx));
+    });
+  }, [selectedDay, updateDay]);
+
+  // ── GOAL HANDLERS ────────────────────────────────────────────────
+  const hAddGoal = useCallback((period, text) => {
+    const newGoal = { id: uid(), text, status: "pending" };
+    markOwnWrite();
+    setAppData(d => {
+      const list = d.goals?.[period] || [];
+      db.upsertGoal(db.goalToRow(newGoal, period, userRef.current?.id, list.length));
+      return { ...d, goals: { ...d.goals, [period]: [...list, newGoal] } };
+    });
+  }, [markOwnWrite]);
 
   const hDeleteGoal = useCallback((period, id) => {
     setAppData(d => ({
       ...d,
       goals: { ...d.goals, [period]: (d.goals?.[period] || []).filter(g => g.id !== id) }
     }));
+    db.deleteGoal(id);
   }, []);
 
   const hSetGoalStatus = useCallback((period, id, status) => {
-    setAppData(d => ({
-      ...d,
-      goals: { ...d.goals, [period]: (d.goals?.[period] || []).map(g => g.id === id ? { ...g, status } : g) }
-    }));
+    setAppData(d => {
+      const list = d.goals?.[period] || [];
+      const idx  = list.findIndex(g => g.id === id);
+      if (idx !== -1) db.upsertGoal(db.goalToRow({ ...list[idx], status }, period, userRef.current?.id, idx));
+      return { ...d, goals: { ...d.goals, [period]: list.map(g => g.id === id ? { ...g, status } : g) } };
+    });
   }, []);
 
   const hUpdateGoalText = useCallback((period, id, text) => {
-    setAppData(d => ({
-      ...d,
-      goals: { ...d.goals, [period]: (d.goals?.[period] || []).map(g => g.id === id ? { ...g, text } : g) }
-    }));
+    setAppData(d => {
+      const list = d.goals?.[period] || [];
+      const idx  = list.findIndex(g => g.id === id);
+      if (idx !== -1) db.upsertGoal(db.goalToRow({ ...list[idx], text }, period, userRef.current?.id, idx));
+      return { ...d, goals: { ...d.goals, [period]: list.map(g => g.id === id ? { ...g, text } : g) } };
+    });
   }, []);
 
   const hReorderGoals = useCallback((period, newGoals) => {
     setAppData(d => ({ ...d, goals: { ...d.goals, [period]: newGoals } }));
+    newGoals.forEach((goal, idx) => db.upsertGoal(db.goalToRow(goal, period, userRef.current?.id, idx)));
   }, []);
 
-  // Habits
+  // ── HABIT HANDLERS ───────────────────────────────────────────────
   const hToggleHabit = useCallback((dayKey, habitId) => {
     setAppData(d => {
-      const log = { ...d.habitLog };
-      if (!log[dayKey]) log[dayKey] = {};
-      log[dayKey] = { ...log[dayKey], [habitId]: !log[dayKey][habitId] };
-      return { ...d, habitLog: log };
+      const dayLog = d.habitLog[dayKey] || {};
+      const newDone = !dayLog[habitId];
+      db.toggleHabitLog(userRef.current?.id, habitId, dayKey, newDone);
+      return { ...d, habitLog: { ...d.habitLog, [dayKey]: { ...dayLog, [habitId]: newDone } } };
     });
   }, []);
+
   const hAddHabit = useCallback((habit) => {
-    setAppData(d => ({ ...d, habits: [...(d.habits || []), habit] }));
-  }, []);
+    markOwnWrite();
+    setAppData(d => {
+      const habits = [...(d.habits || []), habit];
+      db.upsertHabit(db.habitToRow(habit, userRef.current?.id, habits.length - 1));
+      return { ...d, habits };
+    });
+  }, [markOwnWrite]);
+
   const hDeleteHabit = useCallback((id) => {
     setAppData(d => ({ ...d, habits: (d.habits || []).filter(h => h.id !== id) }));
-  }, []);
-  const hRenameHabit = useCallback((id, names) => {
-    setAppData(d => ({ ...d, habits: (d.habits || []).map(h => h.id === id ? { ...h, names } : h) }));
+    db.deleteHabit(id);
   }, []);
 
-  // Stats
-  const now = new Date();
-  const todayBlocks = appData.days[TODAY]?.blocks || [];
-  const todayPct = calcPct(todayBlocks);
+  const hRenameHabit = useCallback((id, names) => {
+    setAppData(d => {
+      const habits = (d.habits || []).map(h => h.id === id ? { ...h, names } : h);
+      const idx    = habits.findIndex(h => h.id === id);
+      if (idx !== -1) db.upsertHabit(db.habitToRow(habits[idx], userRef.current?.id, idx));
+      return { ...d, habits };
+    });
+  }, []);
+
+  // ── EVENT HANDLERS ───────────────────────────────────────────────
+  const hAddEvent = useCallback((evt) => {
+    const newEvt = { id: uid(), ...evt };
+    markOwnWrite();
+    setAppData(d => ({ ...d, events: [...(d.events || []), newEvt] }));
+    db.upsertEvent(db.eventToRow(newEvt, userRef.current?.id));
+  }, [markOwnWrite]);
+
+  const hDeleteEvent = useCallback((id) => {
+    setAppData(d => ({ ...d, events: (d.events || []).filter(e => e.id !== id) }));
+    db.deleteEvent(id);
+  }, []);
+
+  const hUpdateEvent = useCallback((id, patch) => {
+    setAppData(d => {
+      const events = (d.events || []).map(e => e.id === id ? { ...e, ...patch } : e);
+      const event  = events.find(e => e.id === id);
+      if (event) db.upsertEvent(db.eventToRow(event, userRef.current?.id));
+      return { ...d, events };
+    });
+  }, []);
+
+  // ── STATS ────────────────────────────────────────────────────────
+  const now        = new Date();
+  const todayKey   = getLocalToday();
+  const todayBlocks = appData.days[todayKey]?.blocks || [];
+  const todayPct   = calcPct(todayBlocks);
+
   const weekData = (() => {
     const dow = (now.getDay() + 6) % 7;
     return L.days.map((label, i) => {
@@ -3033,6 +2917,7 @@ export default function App() {
       return { label, pct: b ? calcPct(b) : 0 };
     });
   })();
+
   const monthData = (() => {
     const res = [];
     for (let w = 0; w < 4; w++) {
@@ -3043,20 +2928,22 @@ export default function App() {
         const b = appData.days[getDateKey(day)]?.blocks;
         if (b) { tot += calcPct(b); cnt++; }
       }
-      res.push({ label: `${lang==="ru"?"Н":"W"}${w + 1}`, pct: cnt ? Math.round(tot / cnt) : 0 });
+      res.push({ label: `${lang === "ru" ? "Н" : "W"}${w + 1}`, pct: cnt ? Math.round(tot / cnt) : 0 });
     }
     return res;
   })();
+
   const yearData = L.monthsShort.map((label, m) => {
     let tot = 0, cnt = 0;
-    const days = new Date(now.getFullYear(), m + 1, 0).getDate();
-    for (let d = 1; d <= days; d++) {
-      const key = `${now.getFullYear()}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const daysInMonth = new Date(now.getFullYear(), m + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${now.getFullYear()}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
       const b = appData.days[key]?.blocks;
       if (b) { tot += calcPct(b); cnt++; }
     }
     return { label, pct: cnt ? Math.round(tot / cnt) : 0 };
   });
+
   const wAvg = Math.round(weekData.reduce((a, d) => a + d.pct, 0) / 7);
   const mAvg = Math.round(monthData.reduce((a, d) => a + d.pct, 0) / monthData.length);
   const yAvg = Math.round(yearData.reduce((a, d) => a + d.pct, 0) / 12);
@@ -3071,153 +2958,139 @@ export default function App() {
   const exportData = () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(appData, null, 2)], { type: "application/json" }));
-    a.download = `planner-${TODAY}.json`; a.click();
+    a.download = `planner-${todayKey}.json`;
+    a.click();
   };
+
   const importData = (e) => {
     const f = e.target.files[0]; if (!f) return;
-    const r = new FileReader(); r.onload = ev => { try { setAppData(JSON.parse(ev.target.result)); } catch {} }; r.readAsText(f);
+    const r = new FileReader();
+    r.onload = ev => { try { setAppData(JSON.parse(ev.target.result)); } catch {} };
+    r.readAsText(f);
   };
 
   const tabStyle = t => ({
-    padding: "6px 16px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500,
-    background: tab === t ? "rgba(255,255,255,0.9)" : "transparent",
-    color: tab === t ? THEME.text : THEME.textLight,
-    transition: "all 0.2s", fontFamily: "inherit",
-    boxShadow: tab === t ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+    padding: "8px 18px", borderRadius: 30, border: "none", cursor: "pointer",
+    fontSize: 14, fontWeight: tab === t ? 700 : 600,
+    background: tab === t ? "#fff" : "transparent",
+    color: tab === t ? "#2D4A6B" : "#9AAAB8",
+    transition: "all 0.16s", fontFamily: "inherit",
+    boxShadow: tab === t ? "0 3px 10px rgba(45,74,107,0.12)" : "none",
   });
 
-  // Dynamic header title
-  const headerTitle = tab === "habits"
-    ? (lang === "ru" ? "Мои привычки" : "My Habits")
-    : tab === "calendar"
-    ? (lang === "ru" ? "Мой календарь" : "My Calendar")
-    : tab === "stats"
-    ? (lang === "ru" ? "Моя статистика" : "My Stats")
-    : L.title; // "Мой день"
+  const headerTitle =
+    tab === "habits"   ? (lang === "ru" ? "Мои привычки"    : "My Habits")   :
+    tab === "calendar" ? (lang === "ru" ? "Мой календарь"   : "My Calendar") :
+    tab === "stats"    ? (lang === "ru" ? "Моя статистика"  : "My Stats")    :
+    L.title;
 
-  // Events handlers
-  const hAddEvent = useCallback((evt) => {
-    setAppData(d => ({ ...d, events: [...(d.events || []), { id: uid(), ...evt }] }));
-  }, []);
-  const hDeleteEvent = useCallback((id) => {
-    setAppData(d => ({ ...d, events: (d.events || []).filter(e => e.id !== id) }));
-  }, []);
-  const hUpdateEvent = useCallback((id, patch) => {
-    setAppData(d => ({ ...d, events: (d.events || []).map(e => e.id === id ? { ...e, ...patch } : e) }));
-  }, []);
-
+  // ── GUARDS ───────────────────────────────────────────────────────
   if (authLoading) return (
-    <div style={{ position:"fixed", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
+    <div style={{ position:"fixed", inset:0, display:"flex", alignItems:"center",
+      justifyContent:"center",
       background:"linear-gradient(125deg,#DBEAFB 0%,#E6F5ED 30%,#FCF7E2 60%,#FDEAE0 100%)" }}>
       <div style={{ fontSize:32 }}>⌛</div>
     </div>
   );
-  if (!user) return <AuthScreen onAuth={setUser} />;
+  if (!user) return <AuthScreen onAuth={u => { setUser(u); userRef.current = u; }} />;
 
+  // ── RENDER ───────────────────────────────────────────────────────
   return (
-    <div className="animated-bg" style={{ minHeight: "100vh", fontFamily: "'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <div className="animated-bg" style={{ minHeight:"100vh", fontFamily:"'DM Sans','Helvetica Neue',Arial,sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
       <style>{BG_ANIM_STYLE}</style>
 
-      {/* New day modal */}
-      {showNewDayModal && (
-        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"none" }}>
-          <div style={{ background:"rgba(255,255,255,0.85)",backdropFilter:"blur(16px)",borderRadius:24,padding:"40px 36px",width:340,textAlign:"center",border:"1px solid rgba(255,255,255,0.8)",boxShadow:"0 16px 60px rgba(0,0,0,0.12)" }}>
-            <div style={{ fontSize:40,marginBottom:12 }}>🌅</div>
-            <div style={{ fontSize:18,fontWeight:700,color:THEME.text,marginBottom:8 }}>{L.newDay}</div>
-            <div style={{ fontSize:13,color:THEME.textLight,marginBottom:24,lineHeight:1.6 }}>{L.newDayMsg}</div>
-            <button onClick={()=>setShowNewDayModal(false)} style={{ padding:"10px 28px",borderRadius:12,border:"none",background:`linear-gradient(135deg, ${THEME.sunsetApricot}, ${THEME.sunsetDeep})`,color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 16px rgba(255,140,66,0.35)" }}>{L.startDay}</button>
-          </div>
-        </div>
-      )}
-
-      {/* Header v17 */}
+      {/* Header */}
       <header className="v17-header">
         <div className="v17-brand">
           <div className="v17-logo">
-            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2"/>
+              <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
           </div>
           <div>
             <div className="v17-brand-title">{headerTitle}</div>
-            <span className="v17-brand-date">{formatDate(TODAY)}</span>
+            <span className="v17-brand-date">{formatDate(todayKey)}</span>
           </div>
         </div>
         <div className="v17-weather-pill"><WeatherWidget lang={lang}/></div>
         {!isOnline && <span style={{ fontSize:11, color:"#E24B4A", fontWeight:600 }}>📵 Офлайн</span>}
-        {isOnline && syncing && <span className="v17-sync-ok v17-sync-ing">☁ Синхронизация...</span>}
+        {isOnline && syncing  && <span className="v17-sync-ok v17-sync-ing">☁ Синхронизация...</span>}
         {isOnline && !syncing && lastSync && <span className="v17-sync-ok">✓ Синхронизировано</span>}
         <div className="v17-actions">
           <div className="v17-lang-sw">
-            {["ru","en"].map(l=>(
-              <button key={l} className={lang===l?"on":""} onClick={()=>setLang(l)}>{l.toUpperCase()}</button>
+            {["ru","en"].map(l => (
+              <button key={l} className={lang === l ? "on" : ""}
+                onClick={() => setLang(l)}>{l.toUpperCase()}</button>
             ))}
           </div>
           <QuickLinks lang={lang}/>
           <button className="v17-hbtn" onClick={exportData}>↑ {L.export}</button>
-          <button className="v17-hbtn" onClick={async () => {
-            await supabase.auth.signOut();
-            localStorage.removeItem("dailyplanner_v3");
-            localStorage.removeItem("planner_auth");
-          }} title="Выйти" style={{ color:"#EE5B52", borderColor:"rgba(238,91,82,0.3)" }}>
-            ⎋ {lang==="ru" ? "Выйти" : "Sign out"}
+          <button className="v17-hbtn"
+            onClick={async () => {
+              if (unsubscribeRealtimeRef.current) unsubscribeRealtimeRef.current();
+              await supabase.auth.signOut();
+              localStorage.removeItem("dailyplanner_v3");
+            }}
+            style={{ color:"#EE5B52", borderColor:"rgba(238,91,82,0.3)" }}>
+            ⎋ {lang === "ru" ? "Выйти" : "Sign out"}
           </button>
           <label className="v17-hbtn" style={{ cursor:"pointer" }}>
-            ↓ {L.import}<input type="file" accept=".json" onChange={importData} style={{ display:"none" }}/>
+            ↓ {L.import}
+            <input type="file" accept=".json" onChange={importData} style={{ display:"none" }}/>
           </label>
         </div>
       </header>
 
-      <main style={{ maxWidth:1200,margin:"0 auto",padding:"22px 24px 80px" }}>
-        {/* Tabs v17 */}
+      <main style={{ maxWidth:1200, margin:"0 auto", padding:"22px 24px 80px" }}>
+        {/* Tabs */}
         <div className="v17-tabs">
           <TodayDropButton
-            data-today-drop
             tab={tab} todayMode={todayMode} lang={lang} L={L}
             showTodayDrop={showTodayDrop}
             setShowTodayDrop={setShowTodayDrop}
             setTab={setTab}
             setTodayMode={setTodayMode}
             setGoalsPeriod={setGoalsPeriod}
-            tabStyle={t => ({ padding:"8px 18px", borderRadius:30, border:"none", cursor:"pointer", fontSize:14, fontWeight:tab===t?700:600, background:tab===t?"#fff":"transparent", color:tab===t?"#2D4A6B":"#9AAAB8", transition:"all 0.16s", fontFamily:"inherit", boxShadow:tab===t?"0 3px 10px rgba(45,74,107,0.12)":"none" })}
+            tabStyle={tabStyle}
           />
-          {[["habits",L.habits],["calendar",L.calendar],["stats",L.stats]].map(([t,label])=>(
-            <button key={t} className={"v17-tab"+(tab===t?" on":"")} onClick={()=>{ setTab(t); setShowTodayDrop(false); }}>{label}</button>
+          {[["habits", L.habits], ["calendar", L.calendar], ["stats", L.stats]].map(([t, label]) => (
+            <button key={t} className={"v17-tab" + (tab === t ? " on" : "")}
+              onClick={() => { setTab(t); setShowTodayDrop(false); }}>
+              {label}
+            </button>
           ))}
         </div>
 
-        {/* TODAY — день */}
+        {/* TODAY — day view */}
         {tab === "today" && todayMode === "day" && (
           <div style={{ display:"flex", gap:24, alignItems:"flex-start" }}>
             <div style={{ flex:1, minWidth:0 }}>
               <DraggableBlocks
-                blocks={appData.days[TODAY]?.blocks || []} lang={lang} isEditable={true}
-                onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock} onAddTask={hAddTask}
-                onDeleteTask={hDeleteTask} onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
-                onToggleRoutine={hToggleRoutine} onUpdateRoutineLabel={hUpdateRoutineLabel} onUpdateRoutineDays={hUpdateRoutineDays} onReorder={hReorder}
+                blocks={appData.days[todayKey]?.blocks || []}
+                lang={lang} isEditable={true}
+                onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock}
+                onAddTask={hAddTask} onDeleteTask={hDeleteTask}
+                onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
+                onToggleRoutine={hToggleRoutine}
+                onUpdateRoutineLabel={hUpdateRoutineLabel}
+                onUpdateRoutineDays={hUpdateRoutineDays}
+                onReorder={hReorder}
               />
             </div>
-            <EventsPanel
-              events={appData.events || []}
-              lang={lang}
-              onAdd={hAddEvent}
-              onDelete={hDeleteEvent}
-              onUpdate={hUpdateEvent}
-            />
+            <EventsPanel events={appData.events || []} lang={lang}
+              onAdd={hAddEvent} onDelete={hDeleteEvent} onUpdate={hUpdateEvent}/>
           </div>
         )}
 
-        {/* TODAY — цели месяца или года */}
+        {/* TODAY — goals */}
         {tab === "today" && (todayMode === "month" || todayMode === "year") && (
           <GoalsPanel
-            mode={todayMode}
-            goalsPeriod={goalsPeriod}
-            setGoalsPeriod={setGoalsPeriod}
-            goals={appData.goals || {}}
-            lang={lang}
-            onAdd={hAddGoal}
-            onDelete={hDeleteGoal}
-            onSetStatus={hSetGoalStatus}
-            onUpdateText={hUpdateGoalText}
+            mode={todayMode} goalsPeriod={goalsPeriod} setGoalsPeriod={setGoalsPeriod}
+            goals={appData.goals || {}} lang={lang}
+            onAdd={hAddGoal} onDelete={hDeleteGoal}
+            onSetStatus={hSetGoalStatus} onUpdateText={hUpdateGoalText}
             onReorder={hReorderGoals}
           />
         )}
@@ -3225,18 +3098,23 @@ export default function App() {
         {/* HABITS */}
         {tab === "habits" && (
           <div>
-            {/* Period selector */}
-            <div style={{ display:"flex",gap:3,marginBottom:20,background:"rgba(255,255,255,0.35)",borderRadius:20,padding:3,width:"fit-content",backdropFilter:"none" }}>
-              {[["week",L.week],["month",L.month],["year",L.year]].map(([p,label])=>(
-                <button key={p} onClick={()=>setHabitPeriod(p)}
-                  style={{ padding:"5px 16px",borderRadius:18,border:"none",cursor:"pointer",fontSize:12,fontWeight:500,background:habitPeriod===p?"rgba(255,255,255,0.9)":"transparent",color:habitPeriod===p?THEME.text:THEME.textLight,transition:"all 0.2s",fontFamily:"inherit" }}>
+            <div style={{ display:"flex", gap:3, marginBottom:20,
+              background:"rgba(255,255,255,0.35)", borderRadius:20, padding:3, width:"fit-content" }}>
+              {[["week",L.week],["month",L.month],["year",L.year]].map(([p,label]) => (
+                <button key={p} onClick={() => setHabitPeriod(p)}
+                  style={{ padding:"5px 16px", borderRadius:18, border:"none", cursor:"pointer",
+                    fontSize:12, fontWeight:500, fontFamily:"inherit",
+                    background: habitPeriod===p ? "rgba(255,255,255,0.9)" : "transparent",
+                    color: habitPeriod===p ? THEME.text : THEME.textLight, transition:"all 0.2s" }}>
                   {label}
                 </button>
               ))}
             </div>
             <HabitGrid
-              habits={appData.habits || []} habitLog={appData.habitLog || {}} lang={lang} period={habitPeriod}
-              onToggle={hToggleHabit} onAddHabit={hAddHabit} onDeleteHabit={hDeleteHabit} onRenameHabit={hRenameHabit}
+              habits={appData.habits || []} habitLog={appData.habitLog || {}}
+              lang={lang} period={habitPeriod}
+              onToggle={hToggleHabit} onAddHabit={hAddHabit}
+              onDeleteHabit={hDeleteHabit} onRenameHabit={hRenameHabit}
             />
           </div>
         )}
@@ -3244,65 +3122,84 @@ export default function App() {
         {/* CALENDAR */}
         {tab === "calendar" && (
           <div>
-            {/* View toggle */}
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20 }}>
-              <div style={{ display:"flex", background:"rgba(255,255,255,0.35)", borderRadius:20, padding:3, gap:2, backdropFilter:"none" }}>
-                <button onClick={()=>setCalView("mini")}
-                  style={{ padding:"5px 16px", borderRadius:18, border:"none", cursor:"pointer", fontSize:12, fontWeight:500, fontFamily:"inherit", background:calView==="mini"?"rgba(255,255,255,0.9)":"transparent", color:calView==="mini"?THEME.text:THEME.textLight, transition:"all 0.2s" }}>
-                  {lang==="ru"?"Компактный":"Compact"}
-                </button>
-                <button onClick={()=>setCalView("grid")}
-                  style={{ padding:"5px 16px", borderRadius:18, border:"none", cursor:"pointer", fontSize:12, fontWeight:500, fontFamily:"inherit", background:calView==="grid"?"rgba(255,255,255,0.9)":"transparent", color:calView==="grid"?THEME.text:THEME.textLight, transition:"all 0.2s" }}>
-                  {lang==="ru"?"Полный":"Full grid"}
-                </button>
+              <div style={{ display:"flex", background:"rgba(255,255,255,0.35)",
+                borderRadius:20, padding:3, gap:2 }}>
+                {[["mini", lang==="ru"?"Компактный":"Compact"],
+                  ["grid", lang==="ru"?"Полный":"Full grid"]].map(([v,label]) => (
+                  <button key={v} onClick={() => setCalView(v)}
+                    style={{ padding:"5px 16px", borderRadius:18, border:"none", cursor:"pointer",
+                      fontSize:12, fontWeight:500, fontFamily:"inherit",
+                      background: calView===v ? "rgba(255,255,255,0.9)" : "transparent",
+                      color: calView===v ? THEME.text : THEME.textLight, transition:"all 0.2s" }}>
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* MINI view v17 */}
             {calView === "mini" && (
               <div className="cal-compact">
-                <div style={{ background:"rgba(255,255,255,0.9)", backdropFilter:"blur(10px)", borderRadius:22, border:"1px solid rgba(255,255,255,0.7)", boxShadow:"0 18px 50px rgba(58,72,98,0.10)", position:"sticky", top:78 }}>
-                  <CalendarView appData={appData} lang={lang} selectedDay={selectedDay} onSelectDay={handleSelectDay}/>
+                <div style={{ background:"rgba(255,255,255,0.9)", borderRadius:22,
+                  border:"1px solid rgba(255,255,255,0.7)",
+                  boxShadow:"0 18px 50px rgba(58,72,98,0.10)", position:"sticky", top:78 }}>
+                  <CalendarView appData={appData} lang={lang}
+                    selectedDay={selectedDay} onSelectDay={handleSelectDay}/>
                 </div>
                 <div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-                    <span style={{ fontSize:15, fontWeight:600, color:THEME.text }}>{formatDate(selectedDay)}</span>
-                    <span style={{ fontSize:11, padding:"2px 8px", borderRadius:10, background:isToday?"rgba(255,245,238,0.8)":isFuture?"rgba(235,244,253,0.8)":"rgba(245,244,240,0.8)", color:isToday?THEME.sunsetDeep:isFuture?"#0C447C":THEME.textLight }}>
+                    <span style={{ fontSize:15, fontWeight:600, color:THEME.text }}>
+                      {formatDate(selectedDay)}
+                    </span>
+                    <span style={{ fontSize:11, padding:"2px 8px", borderRadius:10,
+                      background: isToday?"rgba(255,245,238,0.8)":isFuture?"rgba(235,244,253,0.8)":"rgba(245,244,240,0.8)",
+                      color: isToday?THEME.sunsetDeep:isFuture?"#0C447C":THEME.textLight }}>
                       {isToday?L.todayBadge:isFuture?L.planningBadge:L.historyBadge}
                     </span>
-                    {isFuture && (
-                      <CalAddEventBtn date={selectedDay} lang={lang} onAdd={hAddEvent}/>
-                    )}
+                    {isFuture && <CalAddEventBtn date={selectedDay} lang={lang} onAdd={hAddEvent}/>}
                   </div>
                   <DraggableBlocks
-                    blocks={currentBlocks} lang={lang} isEditable={isEditable} isStatusEditable={isStatusEditable}
-                    onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock} onAddTask={hAddTask}
-                    onDeleteTask={hDeleteTask} onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
-                    onToggleRoutine={hToggleRoutine} onUpdateRoutineLabel={hUpdateRoutineLabel} onUpdateRoutineDays={hUpdateRoutineDays} onReorder={hReorder}
+                    blocks={currentBlocks} lang={lang}
+                    isEditable={isEditable} isStatusEditable={isStatusEditable}
+                    onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock}
+                    onAddTask={hAddTask} onDeleteTask={hDeleteTask}
+                    onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
+                    onToggleRoutine={hToggleRoutine}
+                    onUpdateRoutineLabel={hUpdateRoutineLabel}
+                    onUpdateRoutineDays={hUpdateRoutineDays}
+                    onReorder={hReorder}
                   />
                   <BacklogPanel backlog={appData.backlog} lang={lang} onUpdate={hUpdateBacklog}/>
                 </div>
               </div>
             )}
 
-            {/* FULL GRID view */}
             {calView === "grid" && (
               <div>
-                <FullGridCalendar appData={appData} lang={lang} selectedDay={selectedDay} onSelectDay={handleSelectDay}/>
-                {/* Day detail below when a day is selected */}
+                <FullGridCalendar appData={appData} lang={lang}
+                  selectedDay={selectedDay} onSelectDay={handleSelectDay}/>
                 {selectedDay && (
                   <div style={{ marginTop:20 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-                      <span style={{ fontSize:15, fontWeight:600, color:THEME.text }}>{formatDate(selectedDay)}</span>
-                      <span style={{ fontSize:11, padding:"2px 8px", borderRadius:10, background:isToday?"rgba(255,245,238,0.8)":isFuture?"rgba(235,244,253,0.8)":"rgba(245,244,240,0.8)", color:isToday?THEME.sunsetDeep:isFuture?"#0C447C":THEME.textLight }}>
+                      <span style={{ fontSize:15, fontWeight:600, color:THEME.text }}>
+                        {formatDate(selectedDay)}
+                      </span>
+                      <span style={{ fontSize:11, padding:"2px 8px", borderRadius:10,
+                        background: isToday?"rgba(255,245,238,0.8)":isFuture?"rgba(235,244,253,0.8)":"rgba(245,244,240,0.8)",
+                        color: isToday?THEME.sunsetDeep:isFuture?"#0C447C":THEME.textLight }}>
                         {isToday?L.todayBadge:isFuture?L.planningBadge:L.historyBadge}
                       </span>
                     </div>
                     <DraggableBlocks
-                      blocks={currentBlocks} lang={lang} isEditable={isEditable} isStatusEditable={isStatusEditable}
-                      onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock} onAddTask={hAddTask}
-                      onDeleteTask={hDeleteTask} onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
-                      onToggleRoutine={hToggleRoutine} onUpdateRoutineLabel={hUpdateRoutineLabel} onUpdateRoutineDays={hUpdateRoutineDays} onReorder={hReorder}
+                      blocks={currentBlocks} lang={lang}
+                      isEditable={isEditable} isStatusEditable={isStatusEditable}
+                      onUpdateBlock={hUpdateBlock} onDeleteBlock={hDeleteBlock}
+                      onAddTask={hAddTask} onDeleteTask={hDeleteTask}
+                      onSetTaskStatus={hSetStatus} onUpdateTaskName={hUpdateName}
+                      onToggleRoutine={hToggleRoutine}
+                      onUpdateRoutineLabel={hUpdateRoutineLabel}
+                      onUpdateRoutineDays={hUpdateRoutineDays}
+                      onReorder={hReorder}
                     />
                     <BacklogPanel backlog={appData.backlog} lang={lang} onUpdate={hUpdateBacklog}/>
                   </div>
@@ -3315,23 +3212,19 @@ export default function App() {
         {/* STATS */}
         {tab === "stats" && (
           <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
-            {/* Rings */}
             <div className="st-card">
               <div className="st-rings">
-                {[
-                  [todayPct, L.dayProgress],
-                  [wAvg, L.weekProgress],
-                  [mAvg, L.monthProgress],
-                  [yAvg, L.yearProgress],
-                ].map(([pct, label]) => {
-                  const r = 46, c = 2 * Math.PI * r;
-                  const off = c * (1 - pct / 100);
+                {[[todayPct, L.dayProgress],[wAvg, L.weekProgress],
+                  [mAvg, L.monthProgress],[yAvg, L.yearProgress]].map(([pct, label]) => {
+                  const r = 46, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
                   return (
                     <div key={label} className="st-ring">
                       <svg className="st-ring-svg" viewBox="0 0 104 104">
                         <circle className="st-ring-track" cx="52" cy="52" r={r}/>
-                        {pct > 0 && <circle className="st-ring-fill" cx="52" cy="52" r={r} strokeDasharray={c} strokeDashoffset={off}/>}
-                        <text className="st-ring-pct" x="52" y="52" dominantBaseline="central" textAnchor="middle">{pct}%</text>
+                        {pct > 0 && <circle className="st-ring-fill" cx="52" cy="52" r={r}
+                          strokeDasharray={c} strokeDashoffset={off}/>}
+                        <text className="st-ring-pct" x="52" y="52"
+                          dominantBaseline="central" textAnchor="middle">{pct}%</text>
                       </svg>
                       <span className="st-ring-label">{label}</span>
                     </div>
@@ -3339,28 +3232,32 @@ export default function App() {
                 })}
               </div>
             </div>
-            {/* Charts */}
-            {[[weekData, L.weekProgress, (lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])],
-              [monthData, L.monthProgress, (lang==="ru"?["Н1","Н2","Н3","Н4"]:["W1","W2","W3","W4"])],
-              [yearData, L.yearProgress, (lang==="ru"?["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"]:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"])],
+            {[[weekData, L.weekProgress,
+                lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]],
+              [monthData, L.monthProgress,
+                lang==="ru"?["Н1","Н2","Н3","Н4"]:["W1","W2","W3","W4"]],
+              [yearData, L.yearProgress,
+                lang==="ru"?["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"]
+                          :["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]],
             ].map(([data, label, xlabels]) => (
               <div key={label} className="st-card">
                 <p className="st-card-title">{label}</p>
                 <HabitAreaChart data={data.map((v,i) => ({ val: v, label: xlabels[i] }))} color="#5B9BE8"/>
-                <div className="st-chart-xlabels">{xlabels.map((l,i)=><span key={i}>{l}</span>)}</div>
+                <div className="st-chart-xlabels">
+                  {xlabels.map((l,i) => <span key={i}>{l}</span>)}
+                </div>
               </div>
             ))}
-            {/* By block */}
             <div className="st-card">
               <p className="st-card-title">{L.byBlock}</p>
               {todayBlocks.map(block => {
-                const col = BLOCK_COLORS.find(c=>c.id===block.colorId)||BLOCK_COLORS[0];
-                const bp = calcPct([block]);
+                const col = BLOCK_COLORS.find(c => c.id === block.colorId) || BLOCK_COLORS[0];
+                const bp  = calcPct([block]);
                 return (
                   <div key={block.id} className="st-brow">
                     <span className="st-brow-name">
                       <span className="st-brow-dot" style={{ background: col.accent }}/>
-                      {block.names[lang]||block.names.ru}
+                      {block.names[lang] || block.names.ru}
                     </span>
                     <span className={"st-brow-pct" + (bp===0?" zero":"")}>{bp}%</span>
                   </div>
@@ -3374,4 +3271,3 @@ export default function App() {
     </div>
   );
 }
-// build 1780652733
