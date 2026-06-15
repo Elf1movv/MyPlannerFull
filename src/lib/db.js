@@ -68,6 +68,16 @@ export async function deleteTask(taskId) {
   } catch (e) { console.warn('deleteTask failed:', e); }
 }
 
+export async function deleteTasksByBlock(blockId) {
+  try {
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('block_id', blockId);
+    if (error) console.warn('deleteTasksByBlock error:', error);
+  } catch (e) { console.warn('deleteTasksByBlock failed:', e); }
+}
+
 // ── HABITS ───────────────────────────────────────────────────────────
 
 export async function fetchHabits(userId) {
