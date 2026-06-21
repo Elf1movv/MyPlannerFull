@@ -2637,9 +2637,9 @@ export default function App() {
     }));
   }, []);
 
-  // ── markOwnWrite: ставим флаг "игнорировать RT INSERT" на 3 сек ──
+  // ── markOwnWrite: ставим флаг "игнорировать RT INSERT" на 5 сек ──
   const markOwnWrite = useCallback(() => {
-    realtimeIgnoreUntil.current = Date.now() + 3000;
+    realtimeIgnoreUntil.current = Date.now() + 5000;
   }, []);
 
   const [previewBlocks, setPreviewBlocks] = useState(null);
@@ -2667,23 +2667,45 @@ export default function App() {
 
   // ── BLOCK HANDLERS ───────────────────────────────────────────────
   const hUpdateBlock = useCallback((bid, patch) => {
-    const dateKey = getLocalToday(); // всегда сегодня для блоков
+    const dateKey = getLocalToday();
     markOwnWrite();
-    updateDay(dateKey, blocks => {
-      if (bid === "__add__") {
+
+    if (bid === "__add__") {
+      // Новый блок — добавляем только в today
+      updateDay(dateKey, blocks => {
         const newBlock = { ...patch, tasks: [] };
         db.upsertBlock(db.blockToRow(newBlock, userRef.current?.id, blocks.length));
         return [...blocks, newBlock];
+      });
+      return;
+    }
+
+    // Обновление существующего блока (название, цвет, pinned):
+    // обновляем ВО ВСЕХ днях стейта чтобы buildNewDay видел актуальный pinned
+    setAppData(d => {
+      const days = { ...d.days };
+      let updatedBlock = null;
+      let updatedIdx = -1;
+
+      Object.keys(days).forEach(date => {
+        const blocks = (days[date]?.blocks || []).map((b, i) => {
+          if (b.id !== bid) return b;
+          const updated = { ...b, ...patch };
+          if (date === dateKey) { updatedBlock = updated; updatedIdx = i; }
+          return updated;
+        });
+        days[date] = { ...days[date], blocks };
+      });
+
+      if (updatedBlock && updatedIdx !== -1) {
+        db.upsertBlock(db.blockToRow(updatedBlock, userRef.current?.id, updatedIdx));
       }
-      const updated = blocks.map(b => b.id === bid ? { ...b, ...patch } : b);
-      const idx = updated.findIndex(b => b.id === bid);
-      if (idx !== -1) db.upsertBlock(db.blockToRow(updated[idx], userRef.current?.id, idx));
-      return updated;
+      return { ...d, days };
     });
   }, [updateDay, markOwnWrite]);
 
   const hDeleteBlock = useCallback((bid) => {
-    // Удаляем блок из всех дней в стейте
+    markOwnWrite();
     setAppData(d => {
       const days = { ...d.days };
       Object.keys(days).forEach(date => {
@@ -2692,10 +2714,9 @@ export default function App() {
       });
       return { ...d, days };
     });
-    // Удаляем блок и его задачи из БД
     db.deleteBlock(bid);
     db.deleteTasksByBlock(bid);
-  }, []);
+  }, [markOwnWrite]);
 
   // ── TASK HANDLERS ────────────────────────────────────────────────
   const hAddTask = useCallback((bid, task) => {
@@ -2711,13 +2732,15 @@ export default function App() {
   }, [selectedDay, updateDay, markOwnWrite]);
 
   const hDeleteTask = useCallback((bid, tid) => {
+    markOwnWrite();
     updateDay(selectedDay, blocks =>
       blocks.map(b => b.id === bid
         ? { ...b, tasks: b.tasks.filter(t => t.id !== tid) } : b));
     db.deleteTask(tid);
-  }, [selectedDay, updateDay]);
+  }, [selectedDay, updateDay, markOwnWrite]);
 
   const hSetStatus = useCallback((bid, tid, status) => {
+    markOwnWrite();
     updateDay(selectedDay, blocks => {
       const updated = blocks.map(b => b.id === bid
         ? { ...b, tasks: b.tasks.map(t => t.id === tid ? { ...t, status } : t) } : b);
@@ -2727,9 +2750,10 @@ export default function App() {
         db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
       return updated;
     });
-  }, [selectedDay, updateDay]);
+  }, [selectedDay, updateDay, markOwnWrite]);
 
   const hUpdateName = useCallback((bid, tid, name) => {
+    markOwnWrite();
     updateDay(selectedDay, blocks => {
       const updated = blocks.map(b => b.id === bid
         ? { ...b, tasks: b.tasks.map(t => t.id === tid
@@ -2740,12 +2764,11 @@ export default function App() {
         db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
       return updated;
     });
-  }, [selectedDay, lang, updateDay]);
+  }, [selectedDay, lang, updateDay, markOwnWrite]);
 
   const hToggleRoutine = useCallback((bid, tid) => {
-    // Один setAppData — объединяем оба обновления
+    markOwnWrite();
     setAppData(d => {
-      // 1. Обновляем задачу
       const dateKey = selectedDay;
       const dayBlocks = (d.days[dateKey]?.blocks || []).map(b => b.id === bid
         ? { ...b, tasks: b.tasks.map(t => t.id === tid
@@ -2754,16 +2777,15 @@ export default function App() {
       const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
       if (block && idx !== -1)
         db.upsertTask(db.taskToRow(block.tasks[idx], bid, dateKey, userRef.current?.id, idx));
-
-      // 2. Чистим будущие дни
       const today = getLocalToday();
       const newDays = { ...d.days, [dateKey]: { ...d.days[dateKey], blocks: dayBlocks } };
       Object.keys(newDays).forEach(k => { if (k > today) newDays[k] = { blocks: [] }; });
       return { ...d, days: newDays };
     });
-  }, [selectedDay]);
+  }, [selectedDay, markOwnWrite]);
 
   const hUpdateRoutineLabel = useCallback((bid, tid, label) => {
+    markOwnWrite();
     updateDay(selectedDay, blocks => {
       const updated = blocks.map(b => b.id === bid
         ? { ...b, tasks: b.tasks.map(t => t.id === tid
@@ -2774,9 +2796,10 @@ export default function App() {
         db.upsertTask(db.taskToRow(block.tasks[idx], bid, selectedDay, userRef.current?.id, idx));
       return updated;
     });
-  }, [selectedDay, updateDay]);
+  }, [selectedDay, updateDay, markOwnWrite]);
 
   const hUpdateRoutineDays = useCallback((bid, tid, routineDays) => {
+    markOwnWrite();
     setAppData(d => {
       const dateKey   = selectedDay;
       const dayBlocks = (d.days[dateKey]?.blocks || []).map(b => b.id === bid
@@ -2786,13 +2809,12 @@ export default function App() {
       const idx   = block?.tasks.findIndex(t => t.id === tid) ?? -1;
       if (block && idx !== -1)
         db.upsertTask(db.taskToRow(block.tasks[idx], bid, dateKey, userRef.current?.id, idx));
-
       const today = getLocalToday();
       const newDays = { ...d.days, [dateKey]: { ...d.days[dateKey], blocks: dayBlocks } };
       Object.keys(newDays).forEach(k => { if (k > today) newDays[k] = { blocks: [] }; });
       return { ...d, days: newDays };
     });
-  }, [selectedDay]);
+  }, [selectedDay, markOwnWrite]);
 
   const hUpdateBacklog = useCallback((updates) => {
     setAppData(d => ({ ...d, backlog: { ...d.backlog, ...updates } }));
@@ -2818,12 +2840,13 @@ export default function App() {
   }, [markOwnWrite]);
 
   const hDeleteGoal = useCallback((period, id) => {
+    markOwnWrite();
     setAppData(d => ({
       ...d,
       goals: { ...d.goals, [period]: (d.goals?.[period] || []).filter(g => g.id !== id) }
     }));
     db.deleteGoal(id);
-  }, []);
+  }, [markOwnWrite]);
 
   const hSetGoalStatus = useCallback((period, id, status) => {
     setAppData(d => {
@@ -2868,9 +2891,10 @@ export default function App() {
   }, [markOwnWrite]);
 
   const hDeleteHabit = useCallback((id) => {
+    markOwnWrite();
     setAppData(d => ({ ...d, habits: (d.habits || []).filter(h => h.id !== id) }));
     db.deleteHabit(id);
-  }, []);
+  }, [markOwnWrite]);
 
   const hRenameHabit = useCallback((id, names) => {
     setAppData(d => {
@@ -2890,18 +2914,20 @@ export default function App() {
   }, [markOwnWrite]);
 
   const hDeleteEvent = useCallback((id) => {
+    markOwnWrite();
     setAppData(d => ({ ...d, events: (d.events || []).filter(e => e.id !== id) }));
     db.deleteEvent(id);
-  }, []);
+  }, [markOwnWrite]);
 
   const hUpdateEvent = useCallback((id, patch) => {
+    markOwnWrite();
     setAppData(d => {
       const events = (d.events || []).map(e => e.id === id ? { ...e, ...patch } : e);
       const event  = events.find(e => e.id === id);
       if (event) db.upsertEvent(db.eventToRow(event, userRef.current?.id));
       return { ...d, events };
     });
-  }, []);
+  }, [markOwnWrite]);
 
   // ── STATS ────────────────────────────────────────────────────────
   const now        = new Date();
